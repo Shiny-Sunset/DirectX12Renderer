@@ -1,0 +1,53 @@
+# ---- Visual Studio / C++ build artifacts ----
+
+# Build output directories
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Bb]uild/
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio cache / options / user-specific files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build logs and intermediate files
+*.tlog
+*.log
+*.obj
+*.o
+*.pdb
+*.idb
+*.ilk
+*.ipch
+*.pch
+*.exp
+*.lib
+*.exe
+*.dll
+*.recipe
+*.lastbuildstate
+*.tmp
+*.vsidx
+
+# IntelliSense / browsing databases
+*.VC.db
+*.VC.db-shm
+*.VC.db-wal
+*.VC.opendb
+ipch/
+
+# NuGet
+packages/
+*.nupkg
+
+# OS-generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
