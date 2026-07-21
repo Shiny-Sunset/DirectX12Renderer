@@ -47,6 +47,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//DebugOutputFormatString("Show window test.");
 	//getchar();
 
+	// -- ウィンドウ関連 --
 	WNDCLASSEX w = {};
 
 	w.cbSize = sizeof(WNDCLASSEX);
@@ -80,6 +81,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// ウィンドウ表示
 	ShowWindow(hwnd, SW_SHOW);
 
+	// -- Direct3D関連 --
+	// -- DirectX3D デバイスの初期化 --
 	// 試そうとする機能レベル（上から順に対応しているか調べる）
 	D3D_FEATURE_LEVEL levels[] =
 	{
@@ -93,8 +96,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	IDXGIFactory6* _dxgiFactory = nullptr;
 	IDXGISwapChain4* _swapchain = nullptr;
 
-
-	// Direct3D デバイスの初期化
 	D3D_FEATURE_LEVEL featureLevel;
 
 	for (auto lv : levels)
@@ -106,8 +107,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 	}
 
-	// DXGIの初期化
+	// -- DXGIの初期化 --
 	auto result = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "CreateDXGIFactory1 is Failed" << std::endl;
+		return -1;
+	}
+#ifdef _DEBUG
+	if (result == S_OK)
+	{
+		std::cout << "CreateDXGIFactory1 is OK" << std::endl;
+	}
+#endif // _DEBUG
 
 	// アダプターの列挙用
 	std::vector <IDXGIAdapter*> adapters;
@@ -135,8 +148,194 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 	}
 
+	// -- コマンドリスト関連の初期化 --
+	ID3D12CommandAllocator* _cmdAllocator = nullptr;
+	ID3D12GraphicsCommandList* _cmdList = nullptr;
 
-	// メッセージループ
+	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "CreateCommandAllocator is Failed" << std::endl;
+		return -1;
+	}
+#ifdef _DEBUG
+	if (result == S_OK)
+	{
+		std::cout << "CreateCommandAllocator is OK" << std::endl;
+	}
+#endif // _DEBUG
+
+	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "CreateCommandList is Failed" << std::endl;
+		return -1;
+	}
+#ifdef _DEBUG
+	if (result == S_OK)
+	{
+		std::cout << "CreateCommandList is OK" << std::endl;
+	}
+#endif // _DEBUG
+
+	ID3D12CommandQueue* _cmdQueue = nullptr;
+
+	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
+
+	// タイムアウト無し
+	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+
+	// アダプターを1つしか使わない時は0でよい
+	cmdQueueDesc.NodeMask = 0;
+
+	// プライオリティは特に指定なし
+	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+
+	// コマンドリストと合わせる
+	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
+	// キュー生成
+	result = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&_cmdQueue));
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "CreateCommandQueue is Failed" << std::endl;
+		return -1;
+	}
+#ifdef _DEBUG
+	if (result == S_OK)
+	{
+		std::cout << "CreateCommandQueue is OK" << std::endl;
+	}
+#endif // _DEBUG
+
+	// -- フェンスの生成 --
+	ID3D12Fence* _fence = nullptr;
+	UINT64 _fenceVal = 0;
+	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "CreateFence is Failed" << std::endl;
+		return -1;
+	}
+#ifdef _DEBUG
+	if (result == S_OK)
+	{
+		std::cout << "CreateFence is OK" << std::endl;
+	}
+#endif // _DEBUG
+
+	// -- スワップチェーンの生成 --
+	DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {};
+
+	swapchainDesc.Width = window_width;
+	swapchainDesc.Height = window_height;
+	swapchainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapchainDesc.Stereo = false;
+	swapchainDesc.SampleDesc.Count = 1;
+	swapchainDesc.SampleDesc.Quality = 0;
+	swapchainDesc.BufferUsage = DXGI_USAGE_BACK_BUFFER;
+	swapchainDesc.BufferCount = 2;
+
+	// バックバッファな伸び縮み可能
+	swapchainDesc.Scaling = DXGI_SCALING_STRETCH;
+
+	// フリップ後は速やかに破棄
+	swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+
+	// 特に指定なし
+	swapchainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+
+	// ウインドウとフルスクリーンの切り替えが可能
+	swapchainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+	result = _dxgiFactory->CreateSwapChainForHwnd(_cmdQueue, hwnd, &swapchainDesc, nullptr, nullptr, (IDXGISwapChain1**)&_swapchain);
+	// 本来はQueryInterfaceなどを用いて
+	// IDXGISwapChain4* への変換チェックをするが、
+	// ここではわかりやすさ重視のためにキャストで対応
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "CreateSwapChainForHwnd is Failed" << std::endl;
+		return -1;
+	}
+#ifdef _DEBUG
+	if (result == S_OK)
+	{
+		std::cout << "CreateSwapChainForHwnd is OK" << std::endl;
+	}
+#endif // _DEBUG
+
+	// -- ディスクリプタヒープの作成 --
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;		// レンダーターゲットビューなのでRTV
+	heapDesc.NodeMask = 0;
+	heapDesc.NumDescriptors = 2;						// 表裏の2つ
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;	// 特に指定なし
+
+	ID3D12DescriptorHeap* rtvHeaps = nullptr;
+
+	result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&rtvHeaps));
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "CreateDescriptorHeap is Failed" << std::endl;
+		return -1;
+	}
+#ifdef _DEBUG
+	if (result == S_OK)
+	{
+		std::cout << "CreateDescriptorHeap is OK" << std::endl;
+	}
+#endif // _DEBUG
+
+	// -- スワップチェーンのメモリと紐づけ --
+	DXGI_SWAP_CHAIN_DESC swcDesc = {};
+
+	result = _swapchain->GetDesc(&swcDesc);
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "_swapchain->GetDesc is Failed" << std::endl;
+		return -1;
+	}
+#ifdef _DEBUG
+	if (result == S_OK)
+	{
+		std::cout << "_swapchain->GetDesc is OK" << std::endl;
+	}
+#endif // _DEBUG
+
+	// 表と裏の2つ分それぞれ紐づける
+	std::vector<ID3D12Resource*> _backBuffers(swcDesc.BufferCount);
+	for (int idx = 0; idx < swcDesc.BufferCount; ++idx)
+	{
+		result = _swapchain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
+		if (FAILED(result))
+		{
+			// 失敗時の処理
+			std::cout << "_swapchain->GetBuffer: _backBuffers[" << idx << "] is Failed" << std::endl;
+			return -1;
+		}
+#ifdef _DEBUG
+		if (result == S_OK)
+		{
+			std::cout << "_swapchain->GetBuffer: _backBuffers[" << idx << "] is OK" << std::endl;
+		}
+#endif // _DEBUG
+
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+
+		handle.ptr += idx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+		_dev->CreateRenderTargetView(_backBuffers[idx], nullptr, handle);
+	}
+
+	// -- メッセージループ --
 	MSG msg = {};
 
 	while (true)
@@ -152,9 +351,49 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{
 			break;
 		}
+
+		// -- 描画処理 --
+		// 現在のバックバッファ（描画対象）の番号を取得
+		auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
+
+		// 描画対象のRTVのハンドルを求める
+		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+		// レンダーターゲットを指定
+		_cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
+
+		// 画面クリア
+		float clearColor[] = { 1.0f, 1.0f, 0.0f, 1.0f };	// 黄色
+		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+
+		// 命令のクローズ
+		_cmdList->Close();
+
+		// -- コマンドリストの実行 --
+		ID3D12CommandList* cmdlists[] = { _cmdList };
+		_cmdQueue->ExecuteCommandLists(1, cmdlists);
+
+		// -- GPUの処理を待つ（フェンスによる同期） --
+		_cmdQueue->Signal(_fence, ++_fenceVal);
+		if (_fence->GetCompletedValue() != _fenceVal)
+		{
+			// イベントを作ってGPUの完了を待つ
+			auto event = CreateEvent(nullptr, false, false, nullptr);
+			_fence->SetEventOnCompletion(_fenceVal, event);
+			WaitForSingleObject(event, INFINITE);
+			CloseHandle(event);
+		}
+
+		// GPUの処理が終わったので、ここで初めてResetできる
+		_cmdAllocator->Reset();						// キューをクリア
+		_cmdList->Reset(_cmdAllocator, nullptr);	// 再びコマンドリストを貯める準備
+
+		// 画面のスワップ（フリップ）
+		_swapchain->Present(1, 0);
 	}
 
-	// もうクラスは使わないので登録解除する
+	// 使用しないクラスの登録解除
 	UnregisterClass(w.lpszClassName, w.hInstance);
 
 	return 0;
