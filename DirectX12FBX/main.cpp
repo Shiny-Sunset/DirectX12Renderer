@@ -25,6 +25,16 @@ void DebugOutputFormatString(const char* format, ...)
 #endif // _DEBUG
 }
 
+void EnableDebugLayer()
+{
+	ID3D12Debug* debugLayer = nullptr;
+	auto result = D3D12GetDebugInterface(
+		IID_PPV_ARGS(&debugLayer)
+	);
+	debugLayer->EnableDebugLayer();	// デバッグレイヤーを有効化する
+	debugLayer->Release();	// 有効化したらインターフェースを解放する
+}
+
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
 	// ウィンドウが破棄されたら呼ばれる
@@ -82,6 +92,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ShowWindow(hwnd, SW_SHOW);
 
 	// -- Direct3D関連 --
+#ifdef _DEBUG
+	// デバッグレイヤーを有効化
+	EnableDebugLayer();
+#endif // _DEBUG
 	// -- DirectX3D デバイスの初期化 --
 	// 試そうとする機能レベル（上から順に対応しているか調べる）
 	D3D_FEATURE_LEVEL levels[] =
@@ -108,7 +122,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 
 	// -- DXGIの初期化 --
+#ifdef _DEBUG
+	auto result = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory));
+#else
 	auto result = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
+#endif // _DEBUG
 	if (FAILED(result))
 	{
 		// 失敗時の処理
@@ -335,6 +353,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		_dev->CreateRenderTargetView(_backBuffers[idx], nullptr, handle);
 	}
 
+	// リソースバリアの生成
+	D3D12_RESOURCE_BARRIER BarrierDesc = {};
+	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;	// 遷移
+	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;	// 指定なし
+	BarrierDesc.Transition.Subresource = 0;
+
 	// -- メッセージループ --
 	MSG msg = {};
 
@@ -360,12 +384,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+		// リソースバリアの指定
+		BarrierDesc.Transition.pResource = _backBuffers[bbIdx];	// バックバッファーリソース
+		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;	// 直前はPRESENT状態
+		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;	// 今からレンダーターゲット状態
+		_cmdList->ResourceBarrier(1, &BarrierDesc);	// バリア指定実行
+
 		// レンダーターゲットを指定
 		_cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
 
 		// 画面クリア
 		float clearColor[] = { 1.0f, 1.0f, 0.0f, 1.0f };	// 黄色
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+
+		// リソースバリアの指定（描画完了 → 表示できる状態に戻す）
+		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;	// 直前はレンダーターゲット状態
+		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;	// 今からPRESENT状態
+		_cmdList->ResourceBarrier(1, &BarrierDesc);	// バリア指定実行
 
 		// 命令のクローズ
 		_cmdList->Close();
@@ -379,9 +414,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		if (_fence->GetCompletedValue() != _fenceVal)
 		{
 			// イベントを作ってGPUの完了を待つ
+			// イベントハンドルの取得
 			auto event = CreateEvent(nullptr, false, false, nullptr);
 			_fence->SetEventOnCompletion(_fenceVal, event);
+			// イベントが発生するまで待ち続ける
 			WaitForSingleObject(event, INFINITE);
+			// イベントハンドルを閉じる
 			CloseHandle(event);
 		}
 
