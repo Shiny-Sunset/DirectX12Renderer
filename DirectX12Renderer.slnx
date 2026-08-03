@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="DirectX12FBX/DirectX12FBX.vcxproj" Id="6c642b02-669a-43cb-a9d1-a87bdd0af432" />
+  <Project Path="DirectX12Renderer/DirectX12Renderer.vcxproj" Id="6c642b02-669a-43cb-a9d1-a87bdd0af432" />
 </Solution>

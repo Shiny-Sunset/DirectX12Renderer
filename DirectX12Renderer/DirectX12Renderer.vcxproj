@@ -22,7 +22,7 @@
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{6c642b02-669a-43cb-a9d1-a87bdd0af432}</ProjectGuid>
-    <RootNamespace>DirectX12FBX</RootNamespace>
+    <RootNamespace>DirectX12Renderer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
