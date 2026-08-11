@@ -11,7 +11,7 @@ DirectX 12 の学習用リポジトリです。ウィンドウ生成から順に
 - [x] ルートシグネチャ、ディスクリプタヒープ、シェーダーリソースビューによるテクスチャの貼り付け
 - [x] 画像ファイルの読み込み（DirectXTex）
 - [x] 定数バッファによる座標変換
-- [ ] 深度バッファ
+- [x] 深度バッファ
 - [ ] 3D モデル（glTF）の読み込みと描画
 
 ## 動作環境
@@ -22,6 +22,10 @@ DirectX 12 の学習用リポジトリです。ウィンドウ生成から順に
 | IDE | Visual Studio 2026（プラットフォームツールセット v145） |
 | C++ | C++20 |
 | プラットフォーム | x64 |
+
+## モデル、モーションファイルの指定方法
+
+`DirectX12Renderer/Application.cpp` の16～18行目あたりの `model_path`、`motion_path` で指定してください。
 
 ## ビルド方法
 
@@ -47,6 +51,20 @@ DirectX 12 の学習用リポジトリです。ウィンドウ生成から順に
 > [!NOTE]
 > DirectXTex 側と本プロジェクト側で構成（Debug / Release）が食い違うとリンクエラーになります。参照するライブラリのパスは `$(Platform)\$(Configuration)` で解決しているため、両者を揃えてビルドしてください。
 
+## アセットの入手
+
+本リポジトリには、再配布が許可されていないサードパーティのアセットを含めていません。PMD モデルを描画するには、以下を各自で用意して配置してください。
+
+| 配置先 | 内容 | 入手元 |
+|---|---|---|
+| `DirectX12Renderer/Model/` | PMD モデルと付随テクスチャ | [MikuMikuDance](https://sites.google.com/view/vpvp/) 同梱の `UserFile/Model/`（あにまさ氏 制作） |
+| `DirectX12Renderer/toon/` | `toon01.bmp` 〜 `toon10.bmp` | MikuMikuDance 同梱の `Data/` |
+| `DirectX12Renderer/motion/` | VMD モーション | 書籍「DirectX12の魔導書」サンプルデータ（[boxerprogrammer/directx12_samples](https://github.com/boxerprogrammer/directx12_samples)） |
+
+いずれも各配布元の利用規約に従って入手・利用してください。
+
+`Model/DangoGirl.glb` は本リポジトリ作者が Blender で作成した自作モデルで、リポジトリに含まれています。
+
 ## サードパーティライセンス
 
 本プロジェクトは以下のライブラリを使用しています。ライセンス全文は [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) を参照してください。
@@ -54,3 +72,6 @@ DirectX 12 の学習用リポジトリです。ウィンドウ生成から順に
 | ライブラリ | ライセンス | 著作権表示 |
 |---|---|---|
 | [DirectXTex](https://github.com/microsoft/DirectXTex) | MIT License | Copyright (c) Microsoft Corporation. |
+| [cgltf](https://github.com/jkuhlmann/cgltf) | MIT License | Copyright (c) 2018-2021 Johannes Kuhlmann |
+
+cgltf は `DirectX12Renderer/External/cgltf.h` として同梱しています。
