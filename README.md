@@ -57,13 +57,29 @@ DirectX 12 の学習用リポジトリです。ウィンドウ生成から順に
 
 | 配置先 | 内容 | 入手元 |
 |---|---|---|
-| `DirectX12Renderer/Model/` | PMD モデルと付随テクスチャ | [MikuMikuDance](https://sites.google.com/view/vpvp/) 同梱の `UserFile/Model/`（あにまさ氏 制作） |
+| `DirectX12Renderer/Model/` | PMD モデルと付随テクスチャ | [MikuMikuDance](https://sites.google.com/view/vpvp/) 同梱の `UserFile/Model/` |
 | `DirectX12Renderer/toon/` | `toon01.bmp` 〜 `toon10.bmp` | MikuMikuDance 同梱の `Data/` |
 | `DirectX12Renderer/motion/` | VMD モーション | 書籍「DirectX12の魔導書」サンプルデータ（[boxerprogrammer/directx12_samples](https://github.com/boxerprogrammer/directx12_samples)） |
 
 いずれも各配布元の利用規約に従って入手・利用してください。
 
 `Model/DangoGirl.glb` は本リポジトリ作者が Blender で作成した自作モデルで、リポジトリに含まれています。
+
+### モデルのクレジット
+
+動作確認に使用している「初音ミク」モデルのクレジットは以下のとおりです。
+
+```
+PolyMo用モデルデータ：初音ミク ver.1.3
+(物理演算対応モデル)
+
+モデリング  ：あにまさ氏
+データ変換  ：京 秋人氏
+Copyright   ：CRYPTON FUTURE MEDIA, INC
+```
+
+キャラクター「初音ミク」はクリプトン・フューチャー・メディア株式会社の著作物であり、
+[ピアプロ・キャラクター・ライセンス](https://piapro.jp/license/pcl/summary)に基づく非営利の利用となります。
 
 ## サードパーティライセンス
 
