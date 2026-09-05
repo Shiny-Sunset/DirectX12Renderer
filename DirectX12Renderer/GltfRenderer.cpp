@@ -1,4 +1,4 @@
-﻿#include "PMDRenderer.h"
+﻿#include "GltfRenderer.h"
 
 #include "Dx12Wrapper.h"
 #include "Util.h"
@@ -58,12 +58,12 @@ namespace
 	}
 }
 
-PMDRenderer::PMDRenderer(Dx12Wrapper& dx12)
+GltfRenderer::GltfRenderer(Dx12Wrapper& dx12)
 	: _dx12(dx12)
 {
 }
 
-bool PMDRenderer::Init()
+bool GltfRenderer::Init()
 {
 	if (!CompileShaders()) return false;
 	if (!CreateRootSignature()) return false;
@@ -72,60 +72,60 @@ bool PMDRenderer::Init()
 	return true;
 }
 
-bool PMDRenderer::CompileShaders()
+bool GltfRenderer::CompileShaders()
 {
 	ComPtr<ID3DBlob> errorBlob;
 
-	// BasicVertexShader の設定
+	// GltfVertexShader の設定
 	auto result = D3DCompileFromFile(
-		L"BasicVertexShader.hlsl",	// シェーダー名
+		L"GltfVertexShader.hlsl",	// シェーダー名
 		nullptr,	// defineは無し
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-		"BasicVS", "vs_5_0",	// 関数は BasicVS、対象シェーダーは vs_5_0
+		"GltfVS", "vs_5_0",	// 関数は GltfVS、対象シェーダーは vs_5_0
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
 		0,
 		&_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
 	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "BasicVertexShader")) return false;
+	if (!CheckShaderResult(result, errorBlob.Get(), "GltfVertexShader")) return false;
 
 	errorBlob.Reset();
 
-	// BasicPixelShaderの設定
+	// GltfPixelShaderの設定
 	result = D3DCompileFromFile(
-		L"BasicPixelShader.hlsl",	// シェーダー名
+		L"GltfPixelShader.hlsl",	// シェーダー名
 		nullptr,	// defineは無し
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-		"BasicPS", "ps_5_0",	// 関数は BasicPS、対象シェーダーは ps_5_0
+		"GltfPS", "ps_5_0",	// 関数は GltfPS、対象シェーダーは ps_5_0
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
 		0,
 		&_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
 	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "BasicPixelShader")) return false;
+	if (!CheckShaderResult(result, errorBlob.Get(), "GltfPixelShader")) return false;
 
 	return true;
 }
 
-bool PMDRenderer::CreateRootSignature()
+bool GltfRenderer::CreateRootSignature()
 {
 	// ディスクリプタレンジの作成
 	D3D12_DESCRIPTOR_RANGE descTblRange[3] = {};
 
-	// 定数用レジスター 0 番(行列)
-	descTblRange[0].NumDescriptors = 2;	// 定数 2 つ
-	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;	// 種別は定数
-	descTblRange[0].BaseShaderRegister = 0;	// 0 番スロットから
+	// b0: シーン行列
+	descTblRange[0].NumDescriptors = 1;
+	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descTblRange[0].BaseShaderRegister = 0;
 	descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	// 定数用レジスター 2 番(マテリアル)
-	descTblRange[1].NumDescriptors = 1;	// 定数 1 つ
-	descTblRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;	// 種別は定数
-	descTblRange[1].BaseShaderRegister = 2;	// 1 番スロットから
+	// b1: マテリアル
+	descTblRange[1].NumDescriptors = 1;
+	descTblRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descTblRange[1].BaseShaderRegister = 1;
 	descTblRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	// テクスチャ用レジスター 0 番
-	descTblRange[2].NumDescriptors = 4;	// テクスチャ 4 つ(テクスチャ、.sph、.spa、トゥーン)
-	descTblRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;	// 種別はテクスチャ
-	descTblRange[2].BaseShaderRegister = 0;	// 0 番スロットから
+	// t0: baseColor テクスチャ
+	descTblRange[2].NumDescriptors = 1;
+	descTblRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descTblRange[2].BaseShaderRegister = 0;
 	descTblRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// ルートパラメーター(ディスクリプタテーブル)の作成
@@ -140,7 +140,8 @@ bool PMDRenderer::CreateRootSignature()
 	// すべてのシェーダーから見える
 	rootparam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-	// 1 番: マテリアル(b1)とテクスチャ(t0〜t3)。マテリアルごとに付け替える
+	
+	// 1 番: マテリアル(b1)とテクスチャ(t0)。マテリアルごとに付け替える
 	rootparam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	// ディスクリプタレンジの配列の先頭アドレス
 	rootparam[1].DescriptorTable.pDescriptorRanges = &descTblRange[1];
@@ -148,26 +149,21 @@ bool PMDRenderer::CreateRootSignature()
 	rootparam[1].DescriptorTable.NumDescriptorRanges = 2;
 	// すべてのシェーダーから見える
 	rootparam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	
 
 	// サンプラーの作成
-	D3D12_STATIC_SAMPLER_DESC samplerDesc[2] = {};
+	D3D12_STATIC_SAMPLER_DESC samplerDesc[1] = {};
 
-	samplerDesc[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;	// 横方向の繰り返し
-	samplerDesc[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;	// 縦方向の繰り返し
-	samplerDesc[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;	// 奥行きの繰り返し
-	samplerDesc[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;	// ボーダーは黒
-	samplerDesc[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;	// 線形補間しない
-	samplerDesc[0].MaxLOD = D3D12_FLOAT32_MAX;	// ミップマップ最大値
-	samplerDesc[0].MinLOD = 0.0f;	// ミップマップ最小値
-	samplerDesc[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;	// ピクセルシェーダーから見える
-	samplerDesc[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;	// リサンプリングしない
-	samplerDesc[0].ShaderRegister = 0;	// シェーダースロット番号を忘れずに
-
-	samplerDesc[1] = samplerDesc[0];	// 変更点以外をコピー
-	samplerDesc[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;	// 横方向に繰り返さない
-	samplerDesc[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;	// 縦方向に繰り返さない
-	samplerDesc[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;	// 奥行きに繰り返さない
-	samplerDesc[1].ShaderRegister = 1;	// シェーダースロット番号を忘れずに
+	samplerDesc[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;      // 横方向の繰り返し
+	samplerDesc[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;      // 縦方向の繰り返し
+	samplerDesc[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;      // 奥行きの繰り返し
+	samplerDesc[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	samplerDesc[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;        // 線形補間する
+	samplerDesc[0].MaxLOD = D3D12_FLOAT32_MAX;
+	samplerDesc[0].MinLOD = 0.0f;
+	samplerDesc[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	samplerDesc[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	samplerDesc[0].ShaderRegister = 0;
 
 	// ルートシグネチャの作成
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
@@ -175,7 +171,7 @@ bool PMDRenderer::CreateRootSignature()
 	rootSignatureDesc.pParameters = &rootparam[0];	// ルートパラメーターの先頭アドレス
 	rootSignatureDesc.NumParameters = 2;	// ルートパラメーター数
 	rootSignatureDesc.pStaticSamplers = samplerDesc;
-	rootSignatureDesc.NumStaticSamplers = 2;
+	rootSignatureDesc.NumStaticSamplers = 1;
 
 	// バイナリコードの作成
 	ComPtr<ID3DBlob> rootSigBlob;
@@ -200,7 +196,7 @@ bool PMDRenderer::CreateRootSignature()
 	return true;
 }
 
-bool PMDRenderer::CreateGraphicsPipeline()
+bool GltfRenderer::CreateGraphicsPipeline()
 {
 	// -- 頂点レイアウト(インプットレイアウト)の作成 --
 	// 1頂点のデータの中身を「どの部分が座標・UV・法線か」に分解し、シェーダー入力に結びつける
@@ -218,16 +214,12 @@ bool PMDRenderer::CreateGraphicsPipeline()
 			"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
 		{
-			// ボーン番号
-			"BONE_NO", 0, DXGI_FORMAT_R16G16_UINT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+			// ジョイント
+			"JOINTS", 0, DXGI_FORMAT_R8G8B8A8_UINT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
 		{
 			// ボーンの重み
-			"WEIGHT", 0, DXGI_FORMAT_R8_UINT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-		{
-			// 輪郭線フラグ
-			"EDGE_FLG", 0, DXGI_FORMAT_R8_UINT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+			"WEIGHTS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
 	};
 
@@ -256,7 +248,7 @@ bool PMDRenderer::CreateGraphicsPipeline()
 	gpipeline.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;	// 中身を塗りつぶす
 	gpipeline.RasterizerState.DepthClipEnable = true;	// 深度方向のクリッピングは有効に
 	// ブレンドステートの設定
-	gpipeline.BlendState.AlphaToCoverageEnable = true;
+	gpipeline.BlendState.AlphaToCoverageEnable = false;
 	gpipeline.BlendState.IndependentBlendEnable = false;
 
 	D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlendDesc = {};
@@ -285,15 +277,33 @@ bool PMDRenderer::CreateGraphicsPipeline()
 	);
 	if (!CheckResult(result, "CreateGraphicsPipelineState")) return false;
 
+	D3D12_RENDER_TARGET_BLEND_DESC blendDesc = {};
+	blendDesc.BlendEnable = true;
+	blendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;               // 描く色 × α
+	blendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;   // 背景 × (1-α)
+	blendDesc.BlendOp = D3D12_BLEND_OP_ADD;                  // 足し合わせる
+	blendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+	blendDesc.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+	blendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	blendDesc.LogicOpEnable = false;
+	blendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	gpipeline.BlendState.RenderTarget[0] = blendDesc;
+
+	// 半透明は深度を書き込まない(後ろのものが描けなくなるのを防ぐ)
+	gpipeline.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+	result = _dx12.Device()->CreateGraphicsPipelineState(
+		&gpipeline, IID_PPV_ARGS(&_blendPipelineState)
+	);
+	if (!CheckResult(result, "CreateGraphicsPipelineState")) return false;
+
 	return true;
 }
 
-void PMDRenderer::BeforeDraw()
+void GltfRenderer::BeforeDraw()
 {
 	auto cmdList = _dx12.CommandList();
-
-	// パイプラインステートの設定
-	cmdList->SetPipelineState(_pipelineState.Get());
 
 	// ルートシグネチャの設定
 	cmdList->SetGraphicsRootSignature(_rootSignature.Get());

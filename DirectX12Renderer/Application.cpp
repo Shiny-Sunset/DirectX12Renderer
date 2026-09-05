@@ -3,6 +3,8 @@
 #include "Dx12Wrapper.h"
 #include "PMDActor.h"
 #include "PMDRenderer.h"
+#include "GltfActor.h"
+#include "GltfRenderer.h"
 
 #include <tchar.h>
 #include <iostream>
@@ -102,15 +104,30 @@ bool Application::Init()
 	if (!_dx12->Init(_hwnd, window_width, window_height)) return false;
 
 	// -- 描画パイプラインの作成 --
+	_gltfRenderer = std::make_unique<GltfRenderer>(*_dx12);
+	if (!_gltfRenderer->Init()) return false;
+
+	/*
 	_pmdRenderer = std::make_unique<PMDRenderer>(*_dx12);
 	if (!_pmdRenderer->Init()) return false;
+	*/
 
 	// -- モデルの読み込み --
+	_gltfActor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer);
+	if (!_gltfActor->Init("Model/DangoGirl.glb")) return false;
+	/*
 	_pmdActor = std::make_unique<PMDActor>(*_dx12);
 	if (!_pmdActor->Init(model_path)) return false;
 	if (!_pmdActor->LoadVMDFile(motion_path)) return false;
+	*/
 
-	_pmdActor->PlayAnimation();
+	//_pmdActor->PlayAnimation();
+
+
+	DirectX::XMFLOAT3 eye(0.0f, 0.9f, -2.0f);	// 視点
+	DirectX::XMFLOAT3 target(0.0f, 0.9f, 0.0f);	// 注視点
+
+	_dx12->SetCamera(eye, target, 0.1f, 100.0f);
 
 	return true;
 }
@@ -136,12 +153,14 @@ void Application::Run()
 
 		// -- 更新処理 --
 		_dx12->Update();
-		_pmdActor->Update();
+		//_pmdActor->Update();
 
 		// -- 描画処理 --
 		_dx12->BeginDraw();
-		_pmdRenderer->BeforeDraw();
-		_pmdActor->Draw();
+		//_pmdRenderer->BeforeDraw();
+		//_pmdActor->Draw();
+		_gltfRenderer->BeforeDraw();
+		_gltfActor->Draw();
 
 		_dx12->EndDraw();
 		_dx12->Flip();
@@ -154,6 +173,8 @@ void Application::Terminate()
 	// (宣言順の逆に破棄されるが、依存関係が分かるように明示的に並べる)
 	_pmdActor.reset();
 	_pmdRenderer.reset();
+	_gltfActor.reset();
+	_gltfRenderer.reset();
 	_dx12.reset();
 
 	// 使用しないクラスの登録解除

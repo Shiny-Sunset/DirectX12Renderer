@@ -149,6 +149,8 @@
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="Dx12Wrapper.cpp" />
+    <ClCompile Include="GltfActor.cpp" />
+    <ClCompile Include="GltfRenderer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PMDActor.cpp" />
     <ClCompile Include="PMDRenderer.cpp" />
@@ -157,6 +159,8 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="Dx12Wrapper.h" />
+    <ClInclude Include="GltfActor.h" />
+    <ClInclude Include="GltfRenderer.h" />
     <ClInclude Include="PMDActor.h" />
     <ClInclude Include="PMDRenderer.h" />
     <ClInclude Include="Util.h" />
@@ -193,6 +197,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="BasicShaderHeader.hlsli" />
+    <None Include="GltfShaderHeader.hlsli" />
+    <!-- glTF 用シェーダーは実行時に D3DCompileFromFile でコンパイルするため、
+         ビルド時の FXC は通さない(None で登録して編集対象としてだけ見せる) -->
+    <None Include="GltfVertexShader.hlsl" />
+    <None Include="GltfPixelShader.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

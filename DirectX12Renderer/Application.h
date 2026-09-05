@@ -6,6 +6,8 @@
 class Dx12Wrapper;
 class PMDRenderer;
 class PMDActor;
+class GltfRenderer;
+class GltfActor;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -51,4 +53,6 @@ private:
 	std::unique_ptr<Dx12Wrapper> _dx12;
 	std::unique_ptr<PMDRenderer> _pmdRenderer;
 	std::unique_ptr<PMDActor> _pmdActor;
+	std::unique_ptr<GltfRenderer> _gltfRenderer;
+	std::unique_ptr<GltfActor> _gltfActor;
 };

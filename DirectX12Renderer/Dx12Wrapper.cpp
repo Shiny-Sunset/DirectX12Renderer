@@ -371,12 +371,17 @@ bool Dx12Wrapper::CreateSceneConstantBuffer()
 	// 回転、平行移動
 	auto worldmat = DirectX::XMMatrixRotationY(DirectX::XM_PIDIV4);
 
-	// ビュー行列
-	// カメラの座標と向きに合わせて頂点座標の変換
-	DirectX::XMFLOAT3 eye(0, 10, -15);	// 視点
-	DirectX::XMFLOAT3 target(0, 10, 0);	// 注視点
+	_mappedScene->world = worldmat;
+
+	return true;
+}
+
+void Dx12Wrapper::SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& target, float nearZ, float farZ)
+{
 	DirectX::XMFLOAT3 up(0, 1, 0);	// 上ベクトル
 
+	// ビュー行列
+	// カメラの座標と向きに合わせて頂点座標の変換
 	auto viewmat = DirectX::XMMatrixLookAtLH(
 		DirectX::XMLoadFloat3(&eye),
 		DirectX::XMLoadFloat3(&target),
@@ -388,16 +393,12 @@ bool Dx12Wrapper::CreateSceneConstantBuffer()
 	auto projmat = DirectX::XMMatrixPerspectiveFovLH(
 		DirectX::XM_PIDIV2,	// 画角は 90°
 		static_cast<float>(_windowWidth) / static_cast<float>(_windowHeight),	// アスペクト比
-		1.0f,	// 近いほう
-		100.0f	// 遠いほう
+		nearZ,	// 近いほう
+		farZ	// 遠いほう
 	);
-
-	_mappedScene->world = worldmat;
 	_mappedScene->view = viewmat;
 	_mappedScene->proj = projmat;
 	_mappedScene->eye = eye;
-
-	return true;
 }
 
 bool Dx12Wrapper::CreateDefaultTextures()
@@ -505,6 +506,79 @@ void Dx12Wrapper::Flip()
 {
 	// 画面のスワップ(フリップ)
 	_swapchain->Present(1, 0);
+}
+
+ComPtr<ID3D12Resource> Dx12Wrapper::CreateTextureFromMemory(const uint8_t* data, size_t size)
+{
+	// -- テクスチャのロード --
+	DirectX::TexMetadata metadata = {};
+	DirectX::ScratchImage scratchImg = {};
+
+	auto result = DirectX::LoadFromWICMemory(
+		data, size, DirectX::WIC_FLAGS_NONE, &metadata, scratchImg
+	);
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		// 戻り値がポインタなので return -1 ではなく nullptr を返す
+		std::cout << "CreateTextureFromMemory " << " is Failed" << std::endl;
+		return nullptr;
+	}
+#ifdef _DEBUG
+	std::cout << "CreateTextureFromMemory " << " is OK" << std::endl;
+#endif // _DEBUG
+
+	auto img = scratchImg.GetImage(0, 0, 0);	// 生データ抽出
+
+	// WriteToSubresource で転送する用のヒープ設定
+	auto texHeapProp = TextureHeapProperties();
+
+	metadata.format = DirectX::MakeSRGB(metadata.format);
+
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.Format = metadata.format;
+	resDesc.Width = metadata.width;	// 幅
+	resDesc.Height = static_cast<UINT>(metadata.height);	// 高さ
+	resDesc.DepthOrArraySize = static_cast<UINT16>(metadata.arraySize);	// 2D で配列でもないので 1
+	resDesc.SampleDesc.Count = 1;	// 通常テクスチャなのでアンチエイリアシングしない
+	resDesc.SampleDesc.Quality = 0;	// クオリティは最低
+	resDesc.MipLevels = static_cast<UINT16>(metadata.mipLevels);	// ミップマップしないのでミップ数は 1 つ
+	resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension);
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;	// レイアウトは決定しない
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+	// バッファ作成
+	ComPtr<ID3D12Resource> texbuff;
+	result = _dev->CreateCommittedResource(
+		&texHeapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		nullptr,
+		IID_PPV_ARGS(&texbuff)
+	);
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "CreateCommittedResource texbuff is Failed" << std::endl;
+		return nullptr;
+	}
+
+	result = texbuff->WriteToSubresource(
+		0,
+		nullptr,
+		img->pixels,
+		static_cast<UINT>(img->rowPitch),
+		static_cast<UINT>(img->slicePitch)
+	);
+	if (FAILED(result))
+	{
+		// 失敗時の処理
+		std::cout << "texbuff->WriteToSubresource is Failed" << std::endl;
+		return nullptr;
+	}
+
+	return texbuff.Get();
 }
 
 ID3D12Resource* Dx12Wrapper::GetTextureByPath(const std::string& texPath)
@@ -640,7 +714,7 @@ ID3D12Resource* Dx12Wrapper::GetTextureByPath(const std::string& texPath)
 	return texbuff.Get();
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> Dx12Wrapper::CreateWhiteTexture()
+ComPtr<ID3D12Resource> Dx12Wrapper::CreateWhiteTexture()
 {
 	auto texHeapProp = TextureHeapProperties();
 	auto resDesc = TextureResourceDesc(4, 4);
@@ -672,7 +746,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> Dx12Wrapper::CreateWhiteTexture()
 	return whiteBuff;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> Dx12Wrapper::CreateBlackTexture()
+ComPtr<ID3D12Resource> Dx12Wrapper::CreateBlackTexture()
 {
 	auto texHeapProp = TextureHeapProperties();
 	auto resDesc = TextureResourceDesc(4, 4);
@@ -704,7 +778,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> Dx12Wrapper::CreateBlackTexture()
 	return blackBuff;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> Dx12Wrapper::CreateGrayGradationTexture()
+ComPtr<ID3D12Resource> Dx12Wrapper::CreateGrayGradationTexture()
 {
 	auto texHeapProp = TextureHeapProperties();
 	auto resDesc = TextureResourceDesc(4, 256);

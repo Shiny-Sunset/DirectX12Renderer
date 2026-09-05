@@ -63,10 +63,24 @@ public:
 	// @return 生成したテクスチャバッファ。失敗した場合は nullptr
 	ID3D12Resource* GetTextureByPath(const std::string& texPath);
 
+	// メモリ上の画像データ(PNG/JPEG のバイト列)からテクスチャを作る
+	// GLB は画像をファイルではなくバイナリチャンク内に埋め込むため、こちらを使う
+	// @param data 画像ファイルの先頭を指すポインタ
+	// @param size バイト数
+	// @return 生成したテクスチャバッファ。失敗した場合は nullptr
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateTextureFromMemory(const uint8_t* data, size_t size);
+
 	// テクスチャが指定されなかったときに使う既定のテクスチャ
 	ID3D12Resource* WhiteTexture() const { return _whiteTex.Get(); }
 	ID3D12Resource* BlackTexture() const { return _blackTex.Get(); }
 	ID3D12Resource* GradTexture() const { return _gradTex.Get(); }
+
+	// カメラを設定し、ビュー行列とプロジェクション行列を作り直す
+	// @param eye 視点
+	// @param target 注視点
+	// @param nearZ 近クリップ面
+	// @param farZ 遠クリップ面
+	void SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& target,float nearZ, float farZ);
 
 private:
 	// ヘッダーのグローバルスコープに using 宣言を置くと、
