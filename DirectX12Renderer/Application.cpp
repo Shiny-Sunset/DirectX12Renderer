@@ -124,7 +124,7 @@ bool Application::Init()
 	//_pmdActor->PlayAnimation();
 
 
-	DirectX::XMFLOAT3 eye(0.0f, 0.9f, -2.0f);	// 視点
+	DirectX::XMFLOAT3 eye(0.0f, 1.0f, -2.0f);	// 視点
 	DirectX::XMFLOAT3 target(0.0f, 0.9f, 0.0f);	// 注視点
 
 	_dx12->SetCamera(eye, target, 0.1f, 100.0f);

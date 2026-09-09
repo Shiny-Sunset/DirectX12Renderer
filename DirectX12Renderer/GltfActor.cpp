@@ -12,6 +12,15 @@ GltfActor::GltfActor(Dx12Wrapper& dx12, GltfRenderer& renderer)
 {
 }
 
+GltfActor::~GltfActor()
+{
+	if (_mappedTransform != nullptr)
+	{
+		_transformBuff->Unmap(0, nullptr);
+		_mappedTransform = nullptr;
+	}
+}
+
 bool GltfActor::Init(const std::string& modelPath)
 {
     std::vector<Vertex> vertices;
@@ -20,6 +29,8 @@ bool GltfActor::Init(const std::string& modelPath)
 	if (!LoadGltfFile(modelPath, vertices, indices)) return false;
 	if (!CreateVertexAndIndexBuffer(vertices, indices)) return false;
 	if (!CreateMaterialBuffer()) return false;
+	if (!CreateTransformBuffer()) return false;
+	UpdateBoneMatrices();
 	if (!CreateMaterialAndTextureView()) return false;
 
 	return true;
@@ -58,7 +69,7 @@ void GltfActor::Draw()
 
 		auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
 		auto handle = heapH;
-		handle.ptr += incSize * (1 + matIdx * DescriptorsPerMaterial);
+		handle.ptr += incSize * (2 + matIdx * DescriptorsPerMaterial);
 		cmdList->SetGraphicsRootDescriptorTable(1, handle);
 
 		cmdList->DrawIndexedInstanced(
@@ -74,7 +85,7 @@ void GltfActor::Draw()
 
 		auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
 		auto handle = heapH;
-		handle.ptr += incSize * (1 + matIdx * DescriptorsPerMaterial);
+		handle.ptr += incSize * (2 + matIdx * DescriptorsPerMaterial);
 		cmdList->SetGraphicsRootDescriptorTable(1, handle);
 
 		cmdList->DrawIndexedInstanced(
@@ -118,6 +129,8 @@ bool GltfActor::LoadGltfFile(
             const cgltf_accessor* posAcc = nullptr;
             const cgltf_accessor* nrmAcc = nullptr;
             const cgltf_accessor* uvAcc = nullptr;
+			const cgltf_accessor* jntAcc = nullptr;
+			const cgltf_accessor* wgtAcc = nullptr;
 
             for (cgltf_size ai = 0; ai < prim.attributes_count; ++ai)
             {
@@ -129,6 +142,8 @@ bool GltfActor::LoadGltfFile(
                 case cgltf_attribute_type_position: posAcc = attr.data; break;
                 case cgltf_attribute_type_normal:   nrmAcc = attr.data; break;
                 case cgltf_attribute_type_texcoord: uvAcc = attr.data; break;
+				case cgltf_attribute_type_joints:   jntAcc = attr.data; break;
+				case cgltf_attribute_type_weights:  wgtAcc = attr.data; break;
                 default: break;
                 }
             }
@@ -167,6 +182,25 @@ bool GltfActor::LoadGltfFile(
 					cgltf_accessor_read_float(uvAcc, k, f, 2);
 					v.uv = { f[0], f[1] };
 				}
+				if (jntAcc != nullptr)
+				{
+					cgltf_uint j[4] = {};
+					cgltf_accessor_read_uint(jntAcc, k, j, 4);
+					v.joints[0] = static_cast<uint8_t>(j[0]);
+					v.joints[1] = static_cast<uint8_t>(j[1]);
+					v.joints[2] = static_cast<uint8_t>(j[2]);
+					v.joints[3] = static_cast<uint8_t>(j[3]);
+				}
+				if (wgtAcc != nullptr)
+				{
+					cgltf_accessor_read_float(wgtAcc, k, f, 4);
+					v.weights = { f[0], f[1], f[2], f[3] };
+				}
+				else
+				{
+					// スキン情報が無い場合は先頭ボーンに 100% 割り当てて潰れを防ぐ
+					v.weights = { 1.0f, 0.0f, 0.0f, 0.0f };
+				}
 
 				vertices.push_back(v);
 			}
@@ -189,6 +223,12 @@ bool GltfActor::LoadGltfFile(
 #endif
 
 	if (!LoadMaterials(data))
+	{
+		cgltf_free(data);
+		return false;
+	}
+
+	if (!LoadNodesAndSkin(data))
 	{
 		cgltf_free(data);
 		return false;
@@ -244,6 +284,74 @@ bool GltfActor::LoadMaterials(const cgltf_data* data)
 		auto texbuff = _dx12.CreateTextureFromMemory(bytes, img->buffer_view->size);
 		imageCache[img] = texbuff;
 		_materialTextures[i] = texbuff;
+	}
+	return true;
+}
+
+bool GltfActor::LoadNodesAndSkin(const cgltf_data* data)
+{
+	// -- 全ノードの TRS と親を取り出す --
+	_nodes.resize(data->nodes_count);
+	for (cgltf_size i = 0; i < data->nodes_count; ++i)
+	{
+		const cgltf_node& n = data->nodes[i];
+		Node& out = _nodes[i];
+
+		out.parent = (n.parent != nullptr)
+			? static_cast<int>(n.parent - data->nodes)   // ポインタ差でインデックス化
+			: -1;
+
+		if (n.has_translation) out.translation = { n.translation[0], n.translation[1], n.translation[2] };
+		if (n.has_rotation)    out.rotation = { n.rotation[0], n.rotation[1], n.rotation[2], n.rotation[3] };
+		if (n.has_scale)       out.scale = { n.scale[0], n.scale[1], n.scale[2] };
+		// has_matrix のモデルは今回は無いので未対応(将来必要なら分解する)
+	}
+
+	if (data->skins_count == 0) return true;   // スキン無しモデルも許容する
+	const cgltf_skin& skin = data->skins[0];
+
+	// -- joint 添字 -> ノード添字 --
+	_jointNodes.resize(skin.joints_count);
+	for (cgltf_size j = 0; j < skin.joints_count; ++j)
+	{
+		_jointNodes[j] = static_cast<int>(skin.joints[j] - data->nodes);
+	}
+
+	// -- 逆バインド行列 --
+	_inverseBindMatrices.resize(skin.joints_count);
+	for (cgltf_size j = 0; j < skin.joints_count; ++j)
+	{
+		float m[16] = {};
+		cgltf_accessor_read_float(skin.inverse_bind_matrices, j, m, 16);
+
+		DirectX::XMFLOAT4X4 f4x4;
+		memcpy(&f4x4, m, sizeof(m));
+		_inverseBindMatrices[j] = DirectX::XMLoadFloat4x4(&f4x4);
+	}
+
+	_boneMatrices.resize(skin.joints_count);
+
+	// 子リストを作る
+	std::vector<std::vector<int>> children(_nodes.size());
+	for (size_t i = 0; i < _nodes.size(); ++i)
+	{
+		if (_nodes[i].parent >= 0) children[_nodes[i].parent].push_back(static_cast<int>(i));
+	}
+
+	// ルートから深さ優先で並べる
+	_nodeOrder.clear();
+	_nodeOrder.reserve(_nodes.size());
+	std::vector<int> stack;
+	for (size_t i = 0; i < _nodes.size(); ++i)
+	{
+		if (_nodes[i].parent < 0) stack.push_back(static_cast<int>(i));
+	}
+	while (!stack.empty())
+	{
+		int i = stack.back();
+		stack.pop_back();
+		_nodeOrder.push_back(i);
+		for (auto c : children[i]) stack.push_back(c);
 	}
 	return true;
 }
@@ -392,8 +500,8 @@ bool GltfActor::CreateMaterialAndTextureView()
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
-	// 先頭はシーン用の定数バッファ(b0)、残りがマテリアル(b1)
-	descHeapDesc.NumDescriptors = static_cast<UINT>(_materials.size()) * DescriptorsPerMaterial + 1;
+	// 先頭はシーン用の定数バッファ(b0)、続いてボーン行列(b1)、それ以降がマテリアル(b2)
+	descHeapDesc.NumDescriptors = static_cast<UINT>(_materials.size()) * DescriptorsPerMaterial + 2;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
 	auto result = device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&_descHeap));
@@ -424,12 +532,19 @@ bool GltfActor::CreateMaterialAndTextureView()
 	_dx12.CreateSceneConstantBufferView(descHeapH);
 	handle.ptr += incSize;
 
+	// [1] ボーン行列用の定数バッファビュー(b1)
+	D3D12_CONSTANT_BUFFER_VIEW_DESC transformCBVDesc = {};
+	transformCBVDesc.BufferLocation = _transformBuff->GetGPUVirtualAddress();
+	transformCBVDesc.SizeInBytes = static_cast<UINT>(_transformBuff->GetDesc().Width);
+	device->CreateConstantBufferView(&transformCBVDesc, handle);
+	handle.ptr += incSize;
+
 	// テクスチャが指定されなかったときに使う既定のテクスチャ
 	auto whiteTex = _dx12.WhiteTexture();
 	auto blackTex = _dx12.BlackTexture();
 	auto gradTex = _dx12.GradTexture();
 
-	// 2 番目以降にマテリアルの定数バッファビュー(b1)をマテリアル数ぶん並べる
+	// 3 番目以降にマテリアルの定数バッファビュー(b2)をマテリアル数ぶん並べる
 	for (UINT i = 0; i < materialNum; ++i)
 	{
 		// マテリアル用CBV
@@ -445,4 +560,93 @@ bool GltfActor::CreateMaterialAndTextureView()
 	}
 
 	return true;
+}
+
+bool GltfActor::CreateTransformBuffer()
+{
+	// ヒープの設定
+	D3D12_HEAP_PROPERTIES transformHeapProp = {};
+
+	transformHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;        // CPUからアクセス可能(マップ可能)
+	transformHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	transformHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+	// リソースの設定
+	D3D12_RESOURCE_DESC transformResDesc = {};
+
+	transformResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	transformResDesc.Width = AlignmentedSize(
+		sizeof(DirectX::XMMATRIX) * MaxBoneCount,
+		D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT
+	);
+	transformResDesc.Height = 1;                          // 必ず 1
+	transformResDesc.DepthOrArraySize = 1;                // 必ず 1
+	transformResDesc.MipLevels = 1;                       // 必ず 1
+	transformResDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
+	transformResDesc.SampleDesc.Count = 1;                // 必ず 1
+	transformResDesc.SampleDesc.Quality = 0;              // 必ず 0
+	transformResDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
+	transformResDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
+
+	auto result = _dx12.Device()->CreateCommittedResource(
+		&transformHeapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&transformResDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&_transformBuff)
+	);
+	if (!CheckResult(result, "CreateCommittedResource _transformBuff")) return false;
+
+	// 毎フレーム書き換えるので、マップしたままにしておく(Unmap はデストラクタで行う)
+	result = _transformBuff->Map(0, nullptr, (void**)&_mappedTransform);
+	if (!CheckResult(result, "_transformBuff->Map")) return false;
+
+	// 使っていない分を触っても壊れないよう、全体を単位行列で埋めてから流し込む
+	std::fill_n(_mappedTransform, MaxBoneCount, DirectX::XMMatrixIdentity());
+	std::copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform);
+
+	return true;
+}
+
+void GltfActor::UpdateBoneMatrices()
+{
+	// 全ノードのグローバル変換を求める
+	std::vector<DirectX::XMMATRIX> globals(_nodes.size());
+	for (int i : _nodeOrder)
+	{
+		const Node& n = _nodes[i];
+		auto local =
+			DirectX::XMMatrixScaling(n.scale.x, n.scale.y, n.scale.z)
+			* DirectX::XMMatrixRotationQuaternion(DirectX::XMLoadFloat4(&n.rotation))
+			* DirectX::XMMatrixTranslation(n.translation.x, n.translation.y, n.translation.z);
+
+		globals[i] = (n.parent < 0) ? local : local * globals[n.parent];
+	}
+
+	// joint ごとに 逆バインド行列 × グローバル変換
+	for (size_t j = 0; j < _jointNodes.size(); ++j)
+	{
+		_boneMatrices[j] = _inverseBindMatrices[j] * globals[_jointNodes[j]];
+	}
+
+	// GPU へ
+	std::fill_n(_mappedTransform, MaxBoneCount, DirectX::XMMatrixIdentity());
+	std::copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform);
+
+#ifdef _DEBUG
+	std::cout << "glTF skin: nodes=" << _nodes.size()
+		<< " joints=" << _jointNodes.size() << std::endl;
+
+	// バインドポーズなら全ボーン行列が単位行列になるはず
+	float maxErr = 0.0f;
+	for (const auto& bm : _boneMatrices)
+	{
+		DirectX::XMFLOAT4X4 f; DirectX::XMStoreFloat4x4(&f, bm);
+		for (int r = 0; r < 4; ++r)
+			for (int c = 0; c < 4; ++c)
+				maxErr = std::max(maxErr, fabsf(f.m[r][c] - (r == c ? 1.0f : 0.0f)));
+	}
+	std::cout << "  bone matrix max error = " << maxErr << std::endl;
+#endif
 }

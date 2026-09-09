@@ -16,7 +16,12 @@ cbuffer SceneBuffer : register(b0)
 Texture2D<float4> baseColorTex : register(t0);
 SamplerState smp : register(s0);
 
-cbuffer Material : register(b1)
+cbuffer Transform : register(b1)
+{
+    matrix bones[256];
+};
+
+cbuffer Material : register(b2)
 {
     float4 baseColorFactor;
 };

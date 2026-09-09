@@ -17,7 +17,7 @@ class GltfActor
 {
 public:
     explicit GltfActor(Dx12Wrapper& dx12, GltfRenderer& _renderer);
-    ~GltfActor() = default;
+    ~GltfActor();
 
     GltfActor(const GltfActor&) = delete;
     GltfActor& operator=(const GltfActor&) = delete;
@@ -72,6 +72,34 @@ private:
     std::vector<ComPtr<ID3D12Resource>> _materialTextures;   // マテリアルごとの baseColor
     ComPtr<ID3D12Resource> _materialBuff;
     size_t _materialBuffSize = 0;
+
+    // シェーダー側の bones[] の要素数(GltfShaderHeader.hlsli と合わせる)
+    static constexpr size_t MaxBoneCount = 256;
+
+    // ノード 1 つ分（アニメーションで TRS を書き換えるので自前で持つ）
+    struct Node
+    {
+        int parent = -1;                                  // 親ノードの添字(-1 = ルート)
+        DirectX::XMFLOAT3 translation = { 0, 0, 0 };
+        DirectX::XMFLOAT4 rotation = { 0, 0, 0, 1 };      // クォータニオン
+        DirectX::XMFLOAT3 scale = { 1, 1, 1 };
+    };
+
+    bool LoadNodesAndSkin(const cgltf_data* data);   // ノード階層とスキンを読む
+    bool CreateTransformBuffer();                     // ボーン行列用の定数バッファ(b1)
+    void UpdateBoneMatrices();                        // ノードから _boneMatrices を作り直す
+
+    std::vector<Node> _nodes;                         // 全ノード
+    std::vector<int> _jointNodes;                     // joint 添字 -> ノード添字
+    std::vector<DirectX::XMMATRIX> _inverseBindMatrices;
+    std::vector<DirectX::XMMATRIX> _boneMatrices;          // GPU に送る
+
+    // 親が必ず先に来る順序を作る（ルートから深さ優先）
+      // glTF のノード配列は親子の順序を保証しないため必要
+    std::vector<int> _nodeOrder;
+
+    ComPtr<ID3D12Resource> _transformBuff;
+    DirectX::XMMATRIX* _mappedTransform = nullptr;    // マップしたまま保持
 
     // -- 初期化のサブルーチン --
     bool LoadGltfFile(

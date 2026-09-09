@@ -111,15 +111,16 @@ bool GltfRenderer::CreateRootSignature()
 	D3D12_DESCRIPTOR_RANGE descTblRange[3] = {};
 
 	// b0: シーン行列
-	descTblRange[0].NumDescriptors = 1;
+	// b1: ボーン行列
+	descTblRange[0].NumDescriptors = 2;
 	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	descTblRange[0].BaseShaderRegister = 0;
 	descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	// b1: マテリアル
+	// b2: マテリアル
 	descTblRange[1].NumDescriptors = 1;
 	descTblRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRange[1].BaseShaderRegister = 1;
+	descTblRange[1].BaseShaderRegister = 2;
 	descTblRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// t0: baseColor テクスチャ
@@ -141,7 +142,7 @@ bool GltfRenderer::CreateRootSignature()
 	rootparam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	
-	// 1 番: マテリアル(b1)とテクスチャ(t0)。マテリアルごとに付け替える
+	// 1 番: マテリアル(b2)とテクスチャ(t0)。マテリアルごとに付け替える
 	rootparam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	// ディスクリプタレンジの配列の先頭アドレス
 	rootparam[1].DescriptorTable.pDescriptorRanges = &descTblRange[1];
