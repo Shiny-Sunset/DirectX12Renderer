@@ -202,6 +202,8 @@
          ビルド時の FXC は通さない(None で登録して編集対象としてだけ見せる) -->
     <None Include="GltfVertexShader.hlsl" />
     <None Include="GltfPixelShader.hlsl" />
+    <None Include="GltfOutlineVertexShader.hlsl" />
+    <None Include="GltfOutlinePixelShader.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

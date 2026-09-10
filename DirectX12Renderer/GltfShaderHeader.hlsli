@@ -5,6 +5,12 @@ struct Output
     float2 uv : TEXCOORD;
 };
 
+// 輪郭線パス用（位置だけあればよい）
+struct OutlineOutput
+{
+    float4 svpos : SV_POSITION;
+};
+
 cbuffer SceneBuffer : register(b0)
 {
     matrix world;

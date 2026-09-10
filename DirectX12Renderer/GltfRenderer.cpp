@@ -102,6 +102,26 @@ bool GltfRenderer::CompileShaders()
 	);
 	if (!CheckShaderResult(result, errorBlob.Get(), "GltfPixelShader")) return false;
 
+	errorBlob.Reset();
+
+	result = D3DCompileFromFile(
+		L"GltfOutlineVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+		"GltfOutlineVS", "vs_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0,
+		&_outlineVsBlob, &errorBlob
+	);
+	if (!CheckShaderResult(result, errorBlob.Get(), "GltfOutlineVertexShader")) return false;
+
+	errorBlob.Reset();
+
+	result = D3DCompileFromFile(
+		L"GltfOutlinePixelShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+		"GltfOutlinePS", "ps_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0,
+		&_outlinePsBlob, &errorBlob
+	);
+	if (!CheckShaderResult(result, errorBlob.Get(), "GltfOutlinePixelShader")) return false;
+
 	return true;
 }
 
@@ -211,6 +231,10 @@ bool GltfRenderer::CreateGraphicsPipeline()
 			"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
 		{
+			// 輪郭線の押し出し用の法線
+			"SMOOTH_NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		},
+		{
 			// uv
 			"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
@@ -298,6 +322,25 @@ bool GltfRenderer::CreateGraphicsPipeline()
 		&gpipeline, IID_PPV_ARGS(&_blendPipelineState)
 	);
 	if (!CheckResult(result, "CreateGraphicsPipelineState")) return false;
+
+	// -- 輪郭線用 PSO --
+	  // シェーダーを差し替え、前面カリングで裏面だけを描く
+	gpipeline.VS.pShaderBytecode = _outlineVsBlob->GetBufferPointer();
+	gpipeline.VS.BytecodeLength = _outlineVsBlob->GetBufferSize();
+	gpipeline.PS.pShaderBytecode = _outlinePsBlob->GetBufferPointer();
+	gpipeline.PS.BytecodeLength = _outlinePsBlob->GetBufferSize();
+
+	// 半透明用に変更した設定を戻す
+	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;      // BlendEnable = false のもの
+	gpipeline.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+
+	// 押し出したシェルの「裏面」だけを描く
+	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
+
+	result = _dx12.Device()->CreateGraphicsPipelineState(
+		&gpipeline, IID_PPV_ARGS(&_outlinePipelineState)
+	);
+	if (!CheckResult(result, "CreateGraphicsPipelineState (outline)")) return false;
 
 	return true;
 }

@@ -7,6 +7,42 @@
 #define CGLTF_IMPLEMENTATION
 #include "External/cgltf.h"
 
+namespace
+{
+	// -- 座標系の変換 --
+	  // glTF は右手系(Y-up, -Z 前方)、このレンダラーは左手系。
+	  // Z 鏡映 M = diag(1, 1, -1, 1) による共役変換 M * A * M で取り込む。
+	  //
+	  // ★ glTF から座標・回転・行列を読むときは必ずこの関数を通すこと。
+	  //    片方だけ変換すると、バインドポーズでは気づけずアニメーションで初めて破綻する。
+
+	  // 位置・平行移動・法線・方向ベクトル
+	DirectX::XMFLOAT3 ToLH(const float v[3])
+	{
+		return { v[0], v[1], -v[2] };
+	}
+
+	// クォータニオン
+	// 回転軸が鏡映されるため x と y が反転する(z と w はそのまま)
+	DirectX::XMFLOAT4 QuatToLH(const float q[4])
+	{
+		return { -q[0], -q[1], q[2], q[3] };
+	}
+
+	// 4x4 行列
+	  // 行と列の「どちらか一方だけ」が z 成分(添字 2)の要素を符号反転する
+	void MatrixToLH(DirectX::XMFLOAT4X4& m)
+	{
+		for (int r = 0; r < 4; ++r)
+		{
+			for (int c = 0; c < 4; ++c)
+			{
+				if ((r == 2) != (c == 2)) m.m[r][c] = -m.m[r][c];
+			}
+		}
+	}
+}
+
 GltfActor::GltfActor(Dx12Wrapper& dx12, GltfRenderer& renderer)
 	: _dx12(dx12), _renderer(renderer)
 {
@@ -30,10 +66,31 @@ bool GltfActor::Init(const std::string& modelPath)
 	if (!CreateVertexAndIndexBuffer(vertices, indices)) return false;
 	if (!CreateMaterialBuffer()) return false;
 	if (!CreateTransformBuffer()) return false;
+	_animNodes = _nodes;
 	UpdateBoneMatrices();
 	if (!CreateMaterialAndTextureView()) return false;
 
 	return true;
+}
+
+void GltfActor::Update()
+{
+	if (_currentAnimation >= 0)
+	{
+		auto elapsed = std::chrono::duration<float>(
+			std::chrono::steady_clock::now() - _startTime).count();
+
+		const float duration = _animations[_currentAnimation].duration;
+		float t = elapsed;
+		if (duration > 0.0f)
+		{
+			t = std::fmod(elapsed, duration);   // ループ再生
+		}
+
+		ApplyAnimation(t);
+	}
+
+	UpdateBoneMatrices();
 }
 
 void GltfActor::Draw()
@@ -60,7 +117,24 @@ void GltfActor::Draw()
 	cmdList->IASetIndexBuffer(&_ibView);
 
 	auto incSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	
 	// プリミティブごとに、担当する範囲だけを描く
+	// 0 周目: 輪郭線
+	  // 押し出したシェルの裏面を描き、本体で覆われなかった縁だけが線として残る
+	  // 半透明マテリアルは面の縁が出てしまうため除外する
+	if (_outlineEnabled)
+	{
+		cmdList->SetPipelineState(_renderer.OutlinePipelineState());
+		for (const auto& p : _primitives)
+		{
+			if (p.isBlend) continue;
+
+			cmdList->DrawIndexedInstanced(
+				p.indexCount, 1, p.startIndexLocation, p.baseVertexLocation, 0
+			);
+		}
+	}
+
 	// 1 周目: 不透明
 	cmdList->SetPipelineState(_renderer.PipelineState());
 	for (const auto& p : _primitives)
@@ -170,12 +244,12 @@ bool GltfActor::LoadGltfFile(
 				float f[4] = {};
 
 				cgltf_accessor_read_float(posAcc, k, f, 3);
-				v.pos = { f[0], f[1], -f[2] };   // 右手系 → 左手系
+				v.pos = ToLH(f);   // 右手系 → 左手系
 
 				if (nrmAcc != nullptr)
 				{
 					cgltf_accessor_read_float(nrmAcc, k, f, 3);
-					v.normal = { f[0], f[1], -f[2] };
+					v.normal = ToLH(f);
 				}
 				if (uvAcc != nullptr)
 				{
@@ -206,14 +280,21 @@ bool GltfActor::LoadGltfFile(
 			}
 
 			// インデックス
-			for (cgltf_size k = 0; k < prim.indices->count; ++k)
+			// 位置を Z 鏡映しているため面の裏表が反転する。
+			// 巻き順(2 番目と 3 番目)を入れ替えて、D3D の既定(時計回り = 表)に合わせる。
+			for (cgltf_size k = 0; k + 2 < prim.indices->count; k += 3)
 			{
-				indices.push_back(static_cast<uint16_t>(cgltf_accessor_read_index(prim.indices, k)));
+				indices.push_back(static_cast<uint16_t>(cgltf_accessor_read_index(prim.indices, k + 0)));
+				indices.push_back(static_cast<uint16_t>(cgltf_accessor_read_index(prim.indices, k + 2)));
+				indices.push_back(static_cast<uint16_t>(cgltf_accessor_read_index(prim.indices, k + 1)));
 			}
 
 			_primitives.push_back(p);
         }
     }
+
+	// 輪郭線用の平均法線を作る（全プリミティブを積み終わってから）
+	BuildSmoothNormals(vertices);
 
 #ifdef _DEBUG
 	std::cout << "glTF: meshes=" << data->meshes_count
@@ -229,6 +310,12 @@ bool GltfActor::LoadGltfFile(
 	}
 
 	if (!LoadNodesAndSkin(data))
+	{
+		cgltf_free(data);
+		return false;
+	}
+
+	if (!LoadAnimations(data))
 	{
 		cgltf_free(data);
 		return false;
@@ -301,8 +388,8 @@ bool GltfActor::LoadNodesAndSkin(const cgltf_data* data)
 			? static_cast<int>(n.parent - data->nodes)   // ポインタ差でインデックス化
 			: -1;
 
-		if (n.has_translation) out.translation = { n.translation[0], n.translation[1], n.translation[2] };
-		if (n.has_rotation)    out.rotation = { n.rotation[0], n.rotation[1], n.rotation[2], n.rotation[3] };
+		if (n.has_translation) out.translation = ToLH(n.translation);
+		if (n.has_rotation)    out.rotation = QuatToLH(n.rotation);
 		if (n.has_scale)       out.scale = { n.scale[0], n.scale[1], n.scale[2] };
 		// has_matrix のモデルは今回は無いので未対応(将来必要なら分解する)
 	}
@@ -326,6 +413,7 @@ bool GltfActor::LoadNodesAndSkin(const cgltf_data* data)
 
 		DirectX::XMFLOAT4X4 f4x4;
 		memcpy(&f4x4, m, sizeof(m));
+		MatrixToLH(f4x4);
 		_inverseBindMatrices[j] = DirectX::XMLoadFloat4x4(&f4x4);
 	}
 
@@ -354,6 +442,121 @@ bool GltfActor::LoadNodesAndSkin(const cgltf_data* data)
 		for (auto c : children[i]) stack.push_back(c);
 	}
 	return true;
+}
+
+bool GltfActor::LoadAnimations(const cgltf_data* data)
+{
+	_animations.resize(data->animations_count);
+	for (cgltf_size ai = 0; ai < data->animations_count; ++ai)
+	{
+		const cgltf_animation& src = data->animations[ai];
+		Animation& dst = _animations[ai];
+		dst.name = (src.name != nullptr) ? src.name : "";
+		dst.channels.reserve(src.channels_count);
+
+		for (cgltf_size ci = 0; ci < src.channels_count; ++ci)
+		{
+			const cgltf_animation_channel& ch = src.channels[ci];
+			if (ch.target_node == nullptr || ch.sampler == nullptr) continue;
+
+			// 対応していないパス(モーフの weights など)は無視する
+			int path;
+			switch (ch.target_path)
+			{
+			case cgltf_animation_path_type_translation: path = 0; break;
+			case cgltf_animation_path_type_rotation:    path = 1; break;
+			case cgltf_animation_path_type_scale:       path = 2; break;
+			default: continue;
+			}
+
+			// CUBICSPLINE は未対応
+			if (ch.sampler->interpolation == cgltf_interpolation_type_cubic_spline) continue;
+
+			AnimChannel out;
+			out.targetNode = static_cast<int>(ch.target_node - data->nodes);
+			out.path = path;
+			out.isStep = (ch.sampler->interpolation == cgltf_interpolation_type_step);
+
+			// 時刻
+			const cgltf_accessor* inAcc = ch.sampler->input;
+			out.times.resize(inAcc->count);
+			for (cgltf_size k = 0; k < inAcc->count; ++k)
+			{
+				cgltf_accessor_read_float(inAcc, k, &out.times[k], 1);
+			}
+
+			// 値（rotation は 4 成分、それ以外は 3 成分）
+			const cgltf_accessor* outAcc = ch.sampler->output;
+			const int comp = (path == 1) ? 4 : 3;
+			out.values.resize(outAcc->count);
+			for (cgltf_size k = 0; k < outAcc->count; ++k)
+			{
+				float v[4] = {};
+				cgltf_accessor_read_float(outAcc, k, v, comp);
+				// 右手系 → 左手系
+				if (path == 1)
+				{
+					// rotation（クォータニオン）
+					out.values[k] = QuatToLH(v);
+				}
+				else if (path == 0)
+				{
+					// translation
+					auto t = ToLH(v);
+					out.values[k] = { t.x, t.y, t.z, 0.0f };
+				}
+				else
+				{
+					// scale は変換不要
+					out.values[k] = { v[0], v[1], v[2], 0.0f };
+				}
+			}
+
+			if (!out.times.empty())
+			{
+				dst.duration = std::max(dst.duration, out.times.back());
+			}
+
+			dst.channels.push_back(std::move(out));
+		}
+	}
+	return true;
+}
+
+void GltfActor::BuildSmoothNormals(std::vector<Vertex>& vertices)
+{
+	// フラットシェーディングのモデルは、同じ座標に複数の法線が割り当てられている。
+	// そのまま押し出すと輪郭線のシェルが継ぎ目で裂けるため、
+	// 位置ごとに法線を平均したものを別に持たせる。
+	// (シェーディング用の normal は変更しないので、見た目のフラット感は保たれる)
+
+	using PosKey = std::tuple<float, float, float>;
+	std::map<PosKey, DirectX::XMFLOAT3> sum;
+
+	for (const auto& v : vertices)
+	{
+		auto& s = sum[{ v.pos.x, v.pos.y, v.pos.z }];
+		s.x += v.normal.x;
+		s.y += v.normal.y;
+		s.z += v.normal.z;
+	}
+
+	for (auto& v : vertices)
+	{
+		const auto& s = sum[{ v.pos.x, v.pos.y, v.pos.z }];
+		auto n = DirectX::XMLoadFloat3(&s);
+
+		// 法線が打ち消し合ってゼロになる位置がある(真裏を向いた面の継ぎ目)
+		// その場合は元の法線をそのまま使う
+		if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(n)) < 1e-12f)
+		{
+			v.smoothNormal = v.normal;
+		}
+		else
+		{
+			DirectX::XMStoreFloat3(&v.smoothNormal, DirectX::XMVector3Normalize(n));
+		}
+	}
 }
 
 bool GltfActor::CreateVertexAndIndexBuffer(
@@ -612,10 +815,10 @@ bool GltfActor::CreateTransformBuffer()
 void GltfActor::UpdateBoneMatrices()
 {
 	// 全ノードのグローバル変換を求める
-	std::vector<DirectX::XMMATRIX> globals(_nodes.size());
+	std::vector<DirectX::XMMATRIX> globals(_animNodes.size());
 	for (int i : _nodeOrder)
 	{
-		const Node& n = _nodes[i];
+		const Node& n = _animNodes[i];
 		auto local =
 			DirectX::XMMatrixScaling(n.scale.x, n.scale.y, n.scale.z)
 			* DirectX::XMMatrixRotationQuaternion(DirectX::XMLoadFloat4(&n.rotation))
@@ -635,18 +838,91 @@ void GltfActor::UpdateBoneMatrices()
 	std::copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform);
 
 #ifdef _DEBUG
-	std::cout << "glTF skin: nodes=" << _nodes.size()
-		<< " joints=" << _jointNodes.size() << std::endl;
-
-	// バインドポーズなら全ボーン行列が単位行列になるはず
-	float maxErr = 0.0f;
-	for (const auto& bm : _boneMatrices)
+	static bool logged = false;
+	if (!logged)
 	{
-		DirectX::XMFLOAT4X4 f; DirectX::XMStoreFloat4x4(&f, bm);
-		for (int r = 0; r < 4; ++r)
-			for (int c = 0; c < 4; ++c)
-				maxErr = std::max(maxErr, fabsf(f.m[r][c] - (r == c ? 1.0f : 0.0f)));
+		std::cout << "glTF skin: nodes=" << _animNodes.size()
+			<< " joints=" << _jointNodes.size() << std::endl;
+
+		// バインドポーズなら全ボーン行列が単位行列になるはず
+		float maxErr = 0.0f;
+		for (const auto& bm : _boneMatrices)
+		{
+			DirectX::XMFLOAT4X4 f; DirectX::XMStoreFloat4x4(&f, bm);
+			for (int r = 0; r < 4; ++r)
+				for (int c = 0; c < 4; ++c)
+					maxErr = std::max(maxErr, fabsf(f.m[r][c] - (r == c ? 1.0f : 0.0f)));
+		}
+		std::cout << "  bone matrix max error = " << maxErr << std::endl;
+
+		std::cout << "glTF animations = " << _animations.size() << std::endl;
+		for (const auto& a : _animations)
+		{
+			std::cout << "  '" << a.name << "' channels=" << a.channels.size()
+				<< " duration=" << a.duration << std::endl;
+		}
 	}
-	std::cout << "  bone matrix max error = " << maxErr << std::endl;
 #endif
+}
+
+void GltfActor::ApplyAnimation(float timeSec)
+{
+	// バインドポーズからやり直す（動かさないノードを残すため）
+	_animNodes = _nodes;
+
+	if (_currentAnimation < 0) return;
+	const Animation& anim = _animations[_currentAnimation];
+
+	for (const auto& ch : anim.channels)
+	{
+		if (ch.times.empty()) continue;
+		Node& node = _animNodes[ch.targetNode];
+
+		// 現在時刻を挟む 2 キーを探す（times は昇順が保証されている）
+		size_t k1 = 0;
+		while (k1 + 1 < ch.times.size() && ch.times[k1 + 1] <= timeSec) ++k1;
+
+		DirectX::XMVECTOR value;
+		if (ch.isStep || k1 + 1 >= ch.times.size())
+		{
+			// STEP、または最後のキーより後 → 手前のキーの値をそのまま使う
+			value = DirectX::XMLoadFloat4(&ch.values[k1]);
+		}
+		else
+		{
+			const size_t k2 = k1 + 1;
+			const float span = ch.times[k2] - ch.times[k1];
+			const float t = (span > 0.0f) ? (timeSec - ch.times[k1]) / span : 0.0f;
+
+			auto v1 = DirectX::XMLoadFloat4(&ch.values[k1]);
+			auto v2 = DirectX::XMLoadFloat4(&ch.values[k2]);
+
+			// 回転はクォータニオンなので球面線形補間、位置とスケールは線形補間
+			value = (ch.path == 1)
+				? DirectX::XMQuaternionSlerp(v1, v2, t)
+				: DirectX::XMVectorLerp(v1, v2, t);
+		}
+
+		switch (ch.path)
+		{
+		case 0: DirectX::XMStoreFloat3(&node.translation, value); break;
+		case 1: DirectX::XMStoreFloat4(&node.rotation, value);    break;
+		case 2: DirectX::XMStoreFloat3(&node.scale, value);       break;
+		}
+	}
+}
+
+bool GltfActor::PlayAnimation(const std::string& name)
+{
+	for (size_t i = 0; i < _animations.size(); ++i)
+	{
+		if (_animations[i].name != name) continue;
+		if (_animations[i].duration <= 0.0f) continue;   // 空アニメーションは無視
+
+		_currentAnimation = static_cast<int>(i);
+		_startTime = std::chrono::steady_clock::now();
+		return true;
+	}
+	std::cout << "PlayAnimation " << name << " is not found" << std::endl;
+	return false;
 }

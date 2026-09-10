@@ -129,6 +129,10 @@ bool Application::Init()
 
 	_dx12->SetCamera(eye, target, 0.1f, 100.0f);
 
+	_gltfActor->PlayAnimation("Walk");
+
+	_gltfActor->SetOutlineEnabled(false);
+
 	return true;
 }
 
@@ -136,6 +140,10 @@ void Application::Run()
 {
 	// -- メッセージループ --
 	MSG msg = {};
+
+	// キーが押されている間ずっと true になるので、前フレームと比較して
+	// 「押された瞬間」だけを拾う
+	bool prevOutlineKey = false;
 
 	while (true)
 	{
@@ -151,8 +159,21 @@ void Application::Run()
 			break;
 		}
 
+		// -- 入力 --
+		const bool outlineKey = (GetAsyncKeyState('O') & 0x8000) != 0;
+		if (outlineKey && !prevOutlineKey)
+		{
+			_gltfActor->SetOutlineEnabled(!_gltfActor->IsOutlineEnabled());
+		}
+		prevOutlineKey = outlineKey;
+
+		if (GetAsyncKeyState('1') & 0x8000) _gltfActor->PlayAnimation("Idle");
+		if (GetAsyncKeyState('2') & 0x8000) _gltfActor->PlayAnimation("Walk");
+		if (GetAsyncKeyState('3') & 0x8000) _gltfActor->PlayAnimation("Run");
+
 		// -- 更新処理 --
 		_dx12->Update();
+		_gltfActor->Update();
 		//_pmdActor->Update();
 
 		// -- 描画処理 --
