@@ -5,9 +5,15 @@
 #include "PMDRenderer.h"
 #include "GltfActor.h"
 #include "GltfRenderer.h"
+#include "DebugUI.h"
+#include "imgui_impl_win32.h"
+#include "imgui.h"
 
 #include <tchar.h>
 #include <iostream>
+
+// imgui_impl_win32.h では意図的にコメントアウトされているため、自分で宣言する
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace
 {
@@ -15,12 +21,16 @@ namespace
 	constexpr int window_height = 1080;
 
 	// 読み込むモデル
-	const char* const model_path = "Model/(ファイル名).pmd";
 	// 読み込むモーション
-	const char* const motion_path = "motion/(ファイル名).vmd";
 
 	LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
+		// ImGui が処理したメッセージはここで終わる
+		if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
+		{
+			return true;
+		}
+
 		// ウィンドウが破棄されたら呼ばれる
 		if (msg == WM_DESTROY)
 		{
@@ -103,6 +113,10 @@ bool Application::Init()
 	_dx12 = std::make_unique<Dx12Wrapper>();
 	if (!_dx12->Init(_hwnd, window_width, window_height)) return false;
 
+	// -- デバッグ UI --
+	_debugUI = std::make_unique<DebugUI>(*_dx12);
+	if (!_debugUI->Init(_hwnd)) return false;
+
 	// -- 描画パイプラインの作成 --
 	_gltfRenderer = std::make_unique<GltfRenderer>(*_dx12);
 	if (!_gltfRenderer->Init()) return false;
@@ -160,21 +174,27 @@ void Application::Run()
 		}
 
 		// -- 入力 --
-		const bool outlineKey = (GetAsyncKeyState('O') & 0x8000) != 0;
+		const bool outlineKey = !_debugUI->WantCaptureKeyboard()
+			&& (GetAsyncKeyState('O') & 0x8000) != 0;
 		if (outlineKey && !prevOutlineKey)
 		{
 			_gltfActor->SetOutlineEnabled(!_gltfActor->IsOutlineEnabled());
 		}
 		prevOutlineKey = outlineKey;
 
-		if (GetAsyncKeyState('1') & 0x8000) _gltfActor->PlayAnimation("Idle");
-		if (GetAsyncKeyState('2') & 0x8000) _gltfActor->PlayAnimation("Walk");
-		if (GetAsyncKeyState('3') & 0x8000) _gltfActor->PlayAnimation("Run");
+		if (!_debugUI->WantCaptureKeyboard() && (GetAsyncKeyState('1') & 0x8000)) _gltfActor->PlayAnimation("Idle");
+		if (!_debugUI->WantCaptureKeyboard() && (GetAsyncKeyState('2') & 0x8000)) _gltfActor->PlayAnimation("Walk");
+		if (!_debugUI->WantCaptureKeyboard() && (GetAsyncKeyState('3') & 0x8000)) _gltfActor->PlayAnimation("Run");
 
 		// -- 更新処理 --
 		_dx12->Update();
 		_gltfActor->Update();
 		//_pmdActor->Update();
+
+		// -- デバッグ UI の組み立て --
+		_debugUI->BeginFrame();
+		BuildDebugUI();
+		_debugUI->EndFrame();
 
 		// -- 描画処理 --
 		_dx12->BeginDraw();
@@ -182,6 +202,8 @@ void Application::Run()
 		//_pmdActor->Draw();
 		_gltfRenderer->BeforeDraw();
 		_gltfActor->Draw();
+
+		_debugUI->Draw();
 
 		_dx12->EndDraw();
 		_dx12->Flip();
@@ -192,6 +214,7 @@ void Application::Terminate()
 {
 	// COM / D3D12 オブジェクトの解放を main() の中で終わらせておく
 	// (宣言順の逆に破棄されるが、依存関係が分かるように明示的に並べる)
+	_debugUI.reset();
 	_pmdActor.reset();
 	_pmdRenderer.reset();
 	_gltfActor.reset();
@@ -202,4 +225,41 @@ void Application::Terminate()
 	UnregisterClass(_windowClass.lpszClassName, _windowClass.hInstance);
 
 	CoUninitialize();
+}
+
+void Application::BuildDebugUI()
+{
+	ImGui::Begin("Debug");
+
+	// -- 性能 --
+	const auto& io = ImGui::GetIO();
+	ImGui::Text("FPS: %.1f (%.2f ms)", io.Framerate, 1000.0f / io.Framerate);
+
+	ImGui::Separator();
+
+	// -- 表示 --
+	bool outline = _gltfActor->IsOutlineEnabled();
+	if (ImGui::Checkbox("Outline", &outline))
+	{
+		_gltfActor->SetOutlineEnabled(outline);
+	}
+
+	ImGui::Separator();
+
+	// -- アニメーション --
+	ImGui::Text("Animation");
+	for (const char* name : { "Idle", "Walk", "Run", "Eat_loop", "Curl_up_loop" })
+	{
+		if (ImGui::Button(name))
+		{
+			_gltfActor->PlayAnimation(name);
+		}
+		ImGui::SameLine();
+	}
+	ImGui::NewLine();
+
+	ImGui::End();
+
+	// ImGui で何ができるかの見本（慣れたら消す）
+	ImGui::ShowDemoWindow();
 }

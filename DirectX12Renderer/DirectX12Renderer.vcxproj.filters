@@ -39,18 +39,36 @@
     <ClCompile Include="GltfRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="External\imgui\imgui.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_demo.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_draw.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_tables.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_widgets.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="DebugUI.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="BasicVertexShader.hlsl">
       <Filter>ソース ファイル</Filter>
     </FxCompile>
     <FxCompile Include="BasicPixelShader.hlsl">
-      <Filter>ソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="GltfVertexShader.hlsl">
-      <Filter>ソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="GltfPixelShader.hlsl">
       <Filter>ソース ファイル</Filter>
     </FxCompile>
   </ItemGroup>
@@ -61,6 +79,10 @@
     <None Include="GltfShaderHeader.hlsli">
       <Filter>ソース ファイル</Filter>
     </None>
+    <None Include="GltfVertexShader.hlsl" />
+    <None Include="GltfPixelShader.hlsl" />
+    <None Include="GltfOutlineVertexShader.hlsl" />
+    <None Include="GltfOutlinePixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h">
@@ -82,6 +104,33 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="GltfRenderer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imconfig.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imgui.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imgui_internal.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imstb_rectpack.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imstb_textedit.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imstb_truetype.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\backends\imgui_impl_dx12.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\backends\imgui_impl_win32.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="DebugUI.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

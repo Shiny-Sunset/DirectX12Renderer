@@ -8,6 +8,7 @@ class PMDRenderer;
 class PMDActor;
 class GltfRenderer;
 class GltfActor;
+class DebugUI;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -48,9 +49,13 @@ private:
 	WNDCLASSEX _windowClass = {};
 	HWND _hwnd = nullptr;
 
+	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
+	void BuildDebugUI();
+
 	// 宣言順がそのまま構築順、破棄はその逆順になる
 	// PMDActor / PMDRenderer は Dx12Wrapper を参照するので、Dx12Wrapper を先に宣言する
 	std::unique_ptr<Dx12Wrapper> _dx12;
+	std::unique_ptr<DebugUI> _debugUI;
 	std::unique_ptr<PMDRenderer> _pmdRenderer;
 	std::unique_ptr<PMDActor> _pmdActor;
 	std::unique_ptr<GltfRenderer> _gltfRenderer;

@@ -52,6 +52,9 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+# Dear ImGui がウィンドウの位置やサイズを保存するファイル（環境依存）
+imgui.ini
+
 # ---- サードパーティのアセット ----
 # 再配布が許可されていないため、リポジトリには含めない
 #   Model/  ... MikuMikuDance 同梱の PMD モデルと付随テクスチャ(あにまさ氏 制作)

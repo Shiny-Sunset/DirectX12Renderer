@@ -20,12 +20,16 @@ DirectX 12 の学習用リポジトリです。ウィンドウ生成から順に
 - [x] glTF のアニメーション（STEP / LINEAR 補間、ループ再生）
 - [x] トゥーンシェーダー（ハーフランバートの階調量子化）
 - [x] 輪郭線の描画（法線方向への押し出しによる背面シェル、O キーで切り替え）
+- [x] Dear ImGui によるデバッグ UI（FPS 表示、輪郭線の切り替え、アニメーションの切り替え）
 
 ## 操作方法
 
 | キー | 動作 |
 |---|---|
 | `O` | 輪郭線の表示 / 非表示を切り替え |
+| `1` / `2` / `3` | アニメーションを Idle / Walk / Run に切り替え |
+
+画面上の「Debug」ウィンドウからも、輪郭線の表示と再生するアニメーションを切り替えられます。ImGui の入力欄にフォーカスがある間は、上記のキー操作は無効になります。
 
 ## 動作環境
 
@@ -38,7 +42,10 @@ DirectX 12 の学習用リポジトリです。ウィンドウ生成から順に
 
 ## モデル、モーションファイルの指定方法
 
-`DirectX12Renderer/Application.cpp` の16～18行目あたりの `model_path`、`motion_path` で指定してください。
+`DirectX12Renderer/Application.cpp` で指定しています。
+
+- glTF モデル：`Application::Init` 内の `_gltfActor->Init("Model/DangoGirl.glb")`
+- PMD モデル / VMD モーション：ファイル先頭付近の `model_path`、`motion_path`（現在は glTF の描画に切り替えているため、PMD の処理はコメントアウトしています）
 
 ## ビルド方法
 
@@ -120,5 +127,6 @@ Copyright (c) 2026 Shiny-Sunset
 |---|---|---|
 | [DirectXTex](https://github.com/microsoft/DirectXTex) | MIT License | Copyright (c) Microsoft Corporation. |
 | [cgltf](https://github.com/jkuhlmann/cgltf) | MIT License | Copyright (c) 2018-2021 Johannes Kuhlmann |
+| [Dear ImGui](https://github.com/ocornut/imgui) | MIT License | Copyright (c) 2014-2026 Omar Cornut |
 
-cgltf は `DirectX12Renderer/External/cgltf.h` として同梱しています。
+cgltf は `DirectX12Renderer/External/cgltf.h`、Dear ImGui は `DirectX12Renderer/External/imgui/` として同梱しています。
