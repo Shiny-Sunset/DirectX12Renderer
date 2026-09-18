@@ -151,6 +151,14 @@ private:
 	// ボーンの座標変換用行列
 	std::vector<DirectX::XMMATRIX> _boneMatrices;
 
+	// シェーダーに渡すモデル固有の行列
+	// (BasicShaderHeader.hlsli の cbuffer Transform と並びを合わせること)
+	struct TransformBufferData
+	{
+		DirectX::XMMATRIX world;
+		DirectX::XMMATRIX bones[MaxBoneCount];
+	};
+
 	// ボーンノードテーブル
 	std::map<std::string, BoneNode> _boneNodeTable;
 
@@ -159,7 +167,7 @@ private:
 
 	// -- ボーン --
 	ComPtr<ID3D12Resource> _transformBuff;
-	DirectX::XMMATRIX* _mappedTransform = nullptr;   // 毎フレーム書くのでマップしたままにする
+	TransformBufferData* _mappedTransform = nullptr;   // 毎フレーム書くのでマップしたままにする
 
 	// 親の変換を子へ伝播させる
 	// @param node 起点のノード

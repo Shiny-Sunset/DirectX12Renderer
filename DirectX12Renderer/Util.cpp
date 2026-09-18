@@ -17,6 +17,44 @@ bool CheckResult(HRESULT result, const char* what)
 	return true;
 }
 
+bool CheckShaderResult(HRESULT result, ID3DBlob* errorBlob, const char* what)
+{
+	if (SUCCEEDED(result))
+	{
+#ifdef _DEBUG
+		std::cout << what << " is OK" << std::endl;
+#endif // _DEBUG
+		return true;
+	}
+
+	if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
+	{
+		std::cout << what << ": ファイルが見つかりません" << std::endl;
+		::OutputDebugStringA("ファイルが見つかりません");
+		return false;
+	}
+
+	std::cout << what << " is Failed" << std::endl;
+
+	// エラー内容が取れないこともあるので、必ず null チェックしてから読む
+	if (errorBlob != nullptr)
+	{
+		std::string errstr;
+		errstr.resize(errorBlob->GetBufferSize());
+
+		std::copy_n(
+			(char*)errorBlob->GetBufferPointer(),
+			errorBlob->GetBufferSize(),
+			errstr.begin()
+		);
+		errstr += "\n";
+
+		std::cout << errstr;
+		::OutputDebugStringA(errstr.c_str());
+	}
+	return false;
+}
+
 size_t AlignmentedSize(size_t size, size_t alignment)
 {
 	// alignment - 1 を足してから下位ビットを切り捨てる

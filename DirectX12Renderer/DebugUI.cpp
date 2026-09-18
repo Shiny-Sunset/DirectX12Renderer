@@ -56,6 +56,7 @@ bool DebugUI::Init(HWND hwnd)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
+    ImGui::GetStyle().FontScaleMain = 1.5f;
 
     // -- Win32 バックエンド（入力とウィンドウサイズ） --
     if (!ImGui_ImplWin32_Init(hwnd)) return false;

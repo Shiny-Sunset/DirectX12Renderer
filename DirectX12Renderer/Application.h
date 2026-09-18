@@ -1,7 +1,9 @@
 ﻿#pragma once
-
 #include <Windows.h>
 #include <memory>
+#include "GameTimer.h"
+#include "Input.h"
+#include "Camera.h"
 
 class Dx12Wrapper;
 class PMDRenderer;
@@ -9,6 +11,7 @@ class PMDActor;
 class GltfRenderer;
 class GltfActor;
 class DebugUI;
+class Ground;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -52,6 +55,9 @@ private:
 	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
 	void BuildDebugUI();
 
+	// プレイヤーの移動と向きを更新する
+	void UpdatePlayer(float deltaTime);
+
 	// 宣言順がそのまま構築順、破棄はその逆順になる
 	// PMDActor / PMDRenderer は Dx12Wrapper を参照するので、Dx12Wrapper を先に宣言する
 	std::unique_ptr<Dx12Wrapper> _dx12;
@@ -60,4 +66,8 @@ private:
 	std::unique_ptr<PMDActor> _pmdActor;
 	std::unique_ptr<GltfRenderer> _gltfRenderer;
 	std::unique_ptr<GltfActor> _gltfActor;
+	std::unique_ptr<Ground> _ground;
+	GameTimer _timer;
+	Input _input;
+	Camera _camera;
 };

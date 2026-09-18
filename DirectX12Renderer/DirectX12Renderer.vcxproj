@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -150,6 +150,10 @@
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="DebugUI.cpp" />
     <ClCompile Include="Dx12Wrapper.cpp" />
+    <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="GameTimer.cpp" />
+    <ClCompile Include="Ground.cpp" />
+    <ClCompile Include="Input.cpp" />
     <ClCompile Include="GltfActor.cpp" />
     <ClCompile Include="GltfRenderer.cpp" />
     <ClCompile Include="main.cpp" />
@@ -197,6 +201,10 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="Dx12Wrapper.h" />
+    <ClInclude Include="Camera.h" />
+    <ClInclude Include="GameTimer.h" />
+    <ClInclude Include="Ground.h" />
+    <ClInclude Include="Input.h" />
     <ClInclude Include="GltfActor.h" />
     <ClInclude Include="GltfRenderer.h" />
     <ClInclude Include="PMDActor.h" />
@@ -242,6 +250,8 @@
     <None Include="GltfPixelShader.hlsl" />
     <None Include="GltfOutlineVertexShader.hlsl" />
     <None Include="GltfOutlinePixelShader.hlsl" />
+    <None Include="GroundVertexShader.hlsl" />
+    <None Include="GroundPixelShader.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

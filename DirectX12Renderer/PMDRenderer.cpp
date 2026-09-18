@@ -12,52 +12,6 @@
 
 using Microsoft::WRL::ComPtr;
 
-namespace
-{
-	// シェーダーのコンパイル結果を検査し、失敗ならエラー内容を出力する
-	// @param result D3DCompileFromFile の戻り値
-	// @param errorBlob エラーメッセージが入る blob(null のこともある)
-	// @param what 処理名
-	// @return 成功したら true
-	bool CheckShaderResult(HRESULT result, ID3DBlob* errorBlob, const char* what)
-	{
-		if (SUCCEEDED(result))
-		{
-#ifdef _DEBUG
-			std::cout << what << " is OK" << std::endl;
-#endif // _DEBUG
-			return true;
-		}
-
-		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
-		{
-			std::cout << what << ": ファイルが見つかりません" << std::endl;
-			::OutputDebugStringA("ファイルが見つかりません");
-			return false;
-		}
-
-		std::cout << what << " is Failed" << std::endl;
-
-		// エラー内容が取れないこともあるので、必ず null チェックしてから読む
-		if (errorBlob != nullptr)
-		{
-			std::string errstr;
-			errstr.resize(errorBlob->GetBufferSize());
-
-			std::copy_n(
-				(char*)errorBlob->GetBufferPointer(),
-				errorBlob->GetBufferSize(),
-				errstr.begin()
-			);
-			errstr += "\n";
-
-			std::cout << errstr;
-			::OutputDebugStringA(errstr.c_str());
-		}
-		return false;
-	}
-}
-
 PMDRenderer::PMDRenderer(Dx12Wrapper& dx12)
 	: _dx12(dx12)
 {

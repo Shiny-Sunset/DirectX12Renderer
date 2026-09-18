@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <string>
 #include <utility>
+#include <d3d12.h>
 
 // HRESULT を検査し、失敗ならエラーメッセージを出して false を返す
 // 成功時は _DEBUG のときだけ "is OK" を出力する
@@ -10,6 +11,13 @@
 // @param what 処理名(メッセージに出力される)
 // @return 成功したら true
 bool CheckResult(HRESULT result, const char* what);
+
+// シェーダーのコンパイル結果を検査し、失敗ならエラー内容を出力する
+// @param result D3DCompileFromFile の戻り値
+// @param errorBlob エラーメッセージが入る blob(null のこともある)
+// @param what 処理名
+// @return 成功したら true
+bool CheckShaderResult(HRESULT result, ID3DBlob* errorBlob, const char* what);
 
 // アライメントにそろえたサイズを返す
 // @param size 元のサイズ

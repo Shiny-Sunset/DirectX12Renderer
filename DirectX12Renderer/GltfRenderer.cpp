@@ -12,52 +12,6 @@
 
 using Microsoft::WRL::ComPtr;
 
-namespace
-{
-	// シェーダーのコンパイル結果を検査し、失敗ならエラー内容を出力する
-	// @param result D3DCompileFromFile の戻り値
-	// @param errorBlob エラーメッセージが入る blob(null のこともある)
-	// @param what 処理名
-	// @return 成功したら true
-	bool CheckShaderResult(HRESULT result, ID3DBlob* errorBlob, const char* what)
-	{
-		if (SUCCEEDED(result))
-		{
-#ifdef _DEBUG
-			std::cout << what << " is OK" << std::endl;
-#endif // _DEBUG
-			return true;
-		}
-
-		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
-		{
-			std::cout << what << ": ファイルが見つかりません" << std::endl;
-			::OutputDebugStringA("ファイルが見つかりません");
-			return false;
-		}
-
-		std::cout << what << " is Failed" << std::endl;
-
-		// エラー内容が取れないこともあるので、必ず null チェックしてから読む
-		if (errorBlob != nullptr)
-		{
-			std::string errstr;
-			errstr.resize(errorBlob->GetBufferSize());
-
-			std::copy_n(
-				(char*)errorBlob->GetBufferPointer(),
-				errorBlob->GetBufferSize(),
-				errstr.begin()
-			);
-			errstr += "\n";
-
-			std::cout << errstr;
-			::OutputDebugStringA(errstr.c_str());
-		}
-		return false;
-	}
-}
-
 GltfRenderer::GltfRenderer(Dx12Wrapper& dx12)
 	: _dx12(dx12)
 {
@@ -150,26 +104,26 @@ bool GltfRenderer::CreateRootSignature()
 	descTblRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// ルートパラメーター(ディスクリプタテーブル)の作成
-	D3D12_ROOT_PARAMETER rootparam[2] = {};
+	D3D12_ROOT_PARAMETER rootParam[2] = {};
 
 	// 0 番: 行列(b0)。描画中は変わらないので 1 回だけ設定する
-	rootparam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	// ディスクリプタレンジの配列の先頭アドレス
-	rootparam[0].DescriptorTable.pDescriptorRanges = &descTblRange[0];
+	rootParam[0].DescriptorTable.pDescriptorRanges = &descTblRange[0];
 	// ディスクリプタレンジ数
-	rootparam[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParam[0].DescriptorTable.NumDescriptorRanges = 1;
 	// すべてのシェーダーから見える
-	rootparam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	
 	// 1 番: マテリアル(b2)とテクスチャ(t0)。マテリアルごとに付け替える
-	rootparam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	// ディスクリプタレンジの配列の先頭アドレス
-	rootparam[1].DescriptorTable.pDescriptorRanges = &descTblRange[1];
+	rootParam[1].DescriptorTable.pDescriptorRanges = &descTblRange[1];
 	// ディスクリプタレンジ数
-	rootparam[1].DescriptorTable.NumDescriptorRanges = 2;
+	rootParam[1].DescriptorTable.NumDescriptorRanges = 2;
 	// すべてのシェーダーから見える
-	rootparam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	
 
 	// サンプラーの作成
@@ -189,7 +143,7 @@ bool GltfRenderer::CreateRootSignature()
 	// ルートシグネチャの作成
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rootSignatureDesc.pParameters = &rootparam[0];	// ルートパラメーターの先頭アドレス
+	rootSignatureDesc.pParameters = &rootParam[0];	// ルートパラメーターの先頭アドレス
 	rootSignatureDesc.NumParameters = 2;	// ルートパラメーター数
 	rootSignatureDesc.pStaticSamplers = samplerDesc;
 	rootSignatureDesc.NumStaticSamplers = 1;

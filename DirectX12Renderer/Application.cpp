@@ -1,5 +1,4 @@
 ﻿#include "Application.h"
-
 #include "Dx12Wrapper.h"
 #include "PMDActor.h"
 #include "PMDRenderer.h"
@@ -8,9 +7,10 @@
 #include "DebugUI.h"
 #include "imgui_impl_win32.h"
 #include "imgui.h"
-
+#include "Ground.h"
 #include <tchar.h>
 #include <iostream>
+#include <algorithm>
 
 // imgui_impl_win32.h では意図的にコメントアウトされているため、自分で宣言する
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -21,7 +21,9 @@ namespace
 	constexpr int window_height = 1080;
 
 	// 読み込むモデル
+	const char* const model_path = "Model/初音ミク.pmd";
 	// 読み込むモーション
+	const char* const motion_path = "motion/motion.vmd";
 
 	LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
@@ -39,6 +41,10 @@ namespace
 		}
 		return DefWindowProc(hwnd, msg, wparam, lparam);
 	}
+
+	constexpr float WalkSpeed = 1.8f;    // m/秒
+	constexpr float RunSpeed = 4.0f;
+	constexpr float TurnSpeed = 12.0f;   // 向きを合わせる速さ
 }
 
 Application& Application::Instance()
@@ -121,6 +127,10 @@ bool Application::Init()
 	_gltfRenderer = std::make_unique<GltfRenderer>(*_dx12);
 	if (!_gltfRenderer->Init()) return false;
 
+	// -- 地面の作成 --
+	_ground = std::make_unique<Ground>(*_dx12);
+	if (!_ground->Init()) return false;
+
 	/*
 	_pmdRenderer = std::make_unique<PMDRenderer>(*_dx12);
 	if (!_pmdRenderer->Init()) return false;
@@ -159,9 +169,10 @@ void Application::Run()
 	// 「押された瞬間」だけを拾う
 	bool prevOutlineKey = false;
 
+	_timer.Reset();
 	while (true)
 	{
-		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -173,23 +184,29 @@ void Application::Run()
 			break;
 		}
 
-		// -- 入力 --
-		const bool outlineKey = !_debugUI->WantCaptureKeyboard()
-			&& (GetAsyncKeyState('O') & 0x8000) != 0;
-		if (outlineKey && !prevOutlineKey)
-		{
-			_gltfActor->SetOutlineEnabled(!_gltfActor->IsOutlineEnabled());
-		}
-		prevOutlineKey = outlineKey;
+		_input.Update();
+		const float dt = _timer.Tick();
 
-		if (!_debugUI->WantCaptureKeyboard() && (GetAsyncKeyState('1') & 0x8000)) _gltfActor->PlayAnimation("Idle");
-		if (!_debugUI->WantCaptureKeyboard() && (GetAsyncKeyState('2') & 0x8000)) _gltfActor->PlayAnimation("Walk");
-		if (!_debugUI->WantCaptureKeyboard() && (GetAsyncKeyState('3') & 0x8000)) _gltfActor->PlayAnimation("Run");
+		// -- 入力 --
+		const bool uiHasKeyboard = _debugUI->WantCaptureKeyboard();
+		if (!uiHasKeyboard)
+		{
+			if (_input.IsTriggered('O')) _gltfActor->SetOutlineEnabled(!_gltfActor->IsOutlineEnabled());
+			if (_input.IsTriggered('1')) _gltfActor->PlayAnimation("Idle");
+			if (_input.IsTriggered('2')) _gltfActor->PlayAnimation("Walk");
+			if (_input.IsTriggered('3')) _gltfActor->PlayAnimation("Run");
+		}
 
 		// -- 更新処理 --
-		_dx12->Update();
-		_gltfActor->Update();
+		UpdatePlayer(dt);
+		_gltfActor->Update(dt);
 		//_pmdActor->Update();
+
+		if (!_debugUI->WantCaptureMouse())
+		{
+			_camera.Update(_input, dt, _gltfActor->Position());
+		}
+		_dx12->SetCamera(_camera.Eye(), _camera.Focus(), 0.1f, 100.0f);
 
 		// -- デバッグ UI の組み立て --
 		_debugUI->BeginFrame();
@@ -199,7 +216,8 @@ void Application::Run()
 		// -- 描画処理 --
 		_dx12->BeginDraw();
 		//_pmdRenderer->BeforeDraw();
-		//_pmdActor->Draw();
+		//_pmdActor->Draw
+		_ground->Draw();
 		_gltfRenderer->BeforeDraw();
 		_gltfActor->Draw();
 
@@ -219,6 +237,7 @@ void Application::Terminate()
 	_pmdRenderer.reset();
 	_gltfActor.reset();
 	_gltfRenderer.reset();
+	_ground.reset();
 	_dx12.reset();
 
 	// 使用しないクラスの登録解除
@@ -229,11 +248,46 @@ void Application::Terminate()
 
 void Application::BuildDebugUI()
 {
-	ImGui::Begin("Debug");
+	ImGui::Begin("Debug", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
 	// -- 性能 --
 	const auto& io = ImGui::GetIO();
 	ImGui::Text("FPS: %.1f (%.2f ms)", io.Framerate, 1000.0f / io.Framerate);
+
+	ImGui::Separator();
+
+	// -- 時間 --
+	ImGui::Text("dt: %.2f ms", _timer.RawDeltaTime() * 1000.0f);
+
+	float timeScale = _timer.TimeScale();
+	if (ImGui::SliderFloat("Time Scale", &timeScale, 0.0f, 3.0f))
+	{
+		_timer.SetTimeScale(timeScale);
+	}
+
+	ImGui::Separator();
+
+	bool vsync = _dx12->IsVSyncEnabled();
+	if (ImGui::Checkbox("VSync", &vsync))
+	{
+		_dx12->SetVSyncEnabled(vsync);
+	}
+
+	ImGui::Separator();
+
+	ImGui::Text("Transform");
+
+	DirectX::XMFLOAT3 pos = _gltfActor->Position();
+	if (ImGui::DragFloat3("Position", &pos.x, 0.01f))
+	{
+		_gltfActor->SetPosition(pos);
+	}
+
+	float yawDeg = DirectX::XMConvertToDegrees(_gltfActor->RotationY());
+	if (ImGui::SliderFloat("Rotation Y", &yawDeg, -180.0f, 180.0f))
+	{
+		_gltfActor->SetRotationY(DirectX::XMConvertToRadians(yawDeg));
+	}
 
 	ImGui::Separator();
 
@@ -247,6 +301,10 @@ void Application::BuildDebugUI()
 	ImGui::Separator();
 
 	// -- アニメーション --
+	ImGui::Text("Anim: %s", _gltfActor->CurrentAnimationName());
+	ImGui::Text("Blend: %.2f", _gltfActor->BlendWeight());
+	ImGui::Separator();
+
 	ImGui::Text("Animation");
 	for (const char* name : { "Idle", "Walk", "Run", "Eat_loop", "Curl_up_loop" })
 	{
@@ -262,4 +320,57 @@ void Application::BuildDebugUI()
 
 	// ImGui で何ができるかの見本（慣れたら消す）
 	ImGui::ShowDemoWindow();
+}
+
+void Application::UpdatePlayer(float deltaTime)
+{
+	// -- 1. 入力を「前後」「左右」の量に変換する --
+	float inputX = 0.0f;   // 右が +
+	float inputZ = 0.0f;   // 前が +
+	if (!_debugUI->WantCaptureKeyboard())
+	{
+		if (_input.IsPressed('W')) inputZ += 1.0f;
+		if (_input.IsPressed('S')) inputZ -= 1.0f;
+		if (_input.IsPressed('D')) inputX += 1.0f;
+		if (_input.IsPressed('A')) inputX -= 1.0f;
+	}
+
+	// 入力が無ければ Idle にして終わり
+	if (inputX == 0.0f && inputZ == 0.0f)
+	{
+		_gltfActor->PlayAnimation("Idle");
+		return;
+	}
+
+	// -- 2. カメラの向きを基準に、ワールドでの進行方向を作る --
+	const float camYaw = _camera.Yaw();   // カメラ未実装のうちは 0.0f を直接書く
+	const DirectX::XMFLOAT3 forward = { sinf(camYaw), 0.0f, cosf(camYaw) };
+	const DirectX::XMFLOAT3 right = { forward.z, 0.0f, -forward.x };
+
+	DirectX::XMVECTOR dir = DirectX::XMVectorAdd(
+		DirectX::XMVectorScale(DirectX::XMLoadFloat3(&forward), inputZ),
+		DirectX::XMVectorScale(DirectX::XMLoadFloat3(&right), inputX));
+	dir = DirectX::XMVector3Normalize(dir);
+
+	// -- 3. 位置を進める --
+	const bool isRunning = _input.IsPressed(VK_SHIFT);
+	const float speed = isRunning ? RunSpeed : WalkSpeed;
+
+	DirectX::XMFLOAT3 pos = _gltfActor->Position();
+	DirectX::XMStoreFloat3(&pos,
+		DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&pos),
+			DirectX::XMVectorScale(dir, speed * deltaTime)));
+	_gltfActor->SetPosition(pos);
+
+	// -- 4. 進行方向へ体を向ける（急に向きが変わらないよう補間する） --
+	DirectX::XMFLOAT3 d;
+	DirectX::XMStoreFloat3(&d, dir);
+	const float targetYaw = atan2f(d.x, d.z);
+
+	float diff = DirectX::XMScalarModAngle(targetYaw - _gltfActor->RotationY());
+	const float t = std::min(1.0f, TurnSpeed * deltaTime);
+	_gltfActor->SetRotationY(_gltfActor->RotationY() + diff * t);
+
+	// -- 5. アニメーション --
+	_gltfActor->PlayAnimation(isRunning ? "Run" : "Walk");
 }

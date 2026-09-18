@@ -13,7 +13,6 @@ struct OutlineOutput
 
 cbuffer SceneBuffer : register(b0)
 {
-    matrix world;
     matrix view;
     matrix proj;
     float3 eye;
@@ -24,6 +23,7 @@ SamplerState smp : register(s0);
 
 cbuffer Transform : register(b1)
 {
+    matrix world;
     matrix bones[256];
 };
 

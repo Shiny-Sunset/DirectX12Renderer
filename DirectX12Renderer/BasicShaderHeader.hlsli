@@ -16,17 +16,17 @@ Texture2D<float4> toon : register(t3); // 3 番スロットに設定されたテ
 SamplerState smp : register(s0); // 0 番スロット設定されたサンプラー
 SamplerState smpToon : register(s1); // 1 番スロット設定されたサンプラー(トゥーン用)
 
-cbuffer cbuff0 : register(b0)   // 定数バッファ
+cbuffer cbuff0 : register(b0)   // 定数バッファ(シーン共通)
 {
-    matrix world; // ワールド変換行列
     matrix view; // ビュー行列
     matrix proj; // プロジェクション行列
     float3 eye; // 視点
 };
 
-// ボーン行列
+// モデル固有の行列
 cbuffer Transform : register(b1)
 {
+    matrix world; // ワールド変換行列
     matrix bones[256];
 };
 

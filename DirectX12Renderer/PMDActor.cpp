@@ -115,7 +115,7 @@ void PMDActor::Update()
 	{
 		RecursiveMatrixMultiply(root, DirectX::XMMatrixIdentity());
 	}
-	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform);
+	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform->bones);
 }
 
 bool PMDActor::LoadPMDFile(
@@ -414,7 +414,7 @@ bool PMDActor::CreateTransformBuffer()
 
 	transformResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	transformResDesc.Width = AlignmentedSize(
-		sizeof(DirectX::XMMATRIX) * MaxBoneCount,
+		sizeof(TransformBufferData),
 		D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT
 		);
 	transformResDesc.Height = 1;                          // 必ず 1
@@ -440,9 +440,12 @@ bool PMDActor::CreateTransformBuffer()
 	result = _transformBuff->Map(0, nullptr, (void**)&_mappedTransform);
 	if (!CheckResult(result, "_transformBuff->Map")) return false;
 
+	// PMD は位置を動かさないので、ワールド行列は単位行列のままにしておく
+	_mappedTransform->world = DirectX::XMMatrixIdentity();
+
 	// 使っていない分を触っても壊れないよう、全体を単位行列で埋めてから流し込む
-	std::fill_n(_mappedTransform, MaxBoneCount, DirectX::XMMatrixIdentity());
-	std::copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform);
+	std::fill_n(_mappedTransform->bones, MaxBoneCount, DirectX::XMMatrixIdentity());
+	std::copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform->bones);
 
 	return true;
 }
@@ -747,7 +750,7 @@ void PMDActor::moveBone()
 	{
 		RecursiveMatrixMultiply(root, DirectX::XMMatrixIdentity());
 	}
-	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform);
+	copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform->bones);
 }
 
 void PMDActor::PlayAnimation()

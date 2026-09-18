@@ -367,12 +367,6 @@ bool Dx12Wrapper::CreateSceneConstantBuffer()
 	result = _sceneConstBuff->Map(0, nullptr, (void**)&_mappedScene);	// マップ
 	if (!CheckResult(result, "_sceneConstBuff->Map")) return false;
 
-	// ワールド行列
-	// 回転、平行移動
-	auto worldmat = DirectX::XMMatrixRotationY(DirectX::XM_PIDIV4);
-
-	_mappedScene->world = worldmat;
-
 	return true;
 }
 
@@ -418,14 +412,6 @@ void Dx12Wrapper::CreateSceneConstantBufferView(D3D12_CPU_DESCRIPTOR_HANDLE hand
 	matrixCBVDesc.SizeInBytes = static_cast<UINT>(_sceneConstBuff->GetDesc().Width);	// 256 バイト境界に揃ったサイズ
 
 	_dev->CreateConstantBufferView(&matrixCBVDesc, handle);
-}
-
-void Dx12Wrapper::Update()
-{
-	// TODO: 複数のモデルを扱うようになったら、ワールド行列は
-	//       シーン共通の b0 ではなくモデルごとの定数バッファに移すこと
-	_angle += 0.002f;
-	_mappedScene->world = DirectX::XMMatrixRotationY(_angle);
 }
 
 void Dx12Wrapper::BeginDraw()
@@ -504,8 +490,10 @@ void Dx12Wrapper::WaitForCommandQueue()
 
 void Dx12Wrapper::Flip()
 {
-	// 画面のスワップ(フリップ)
-	_swapchain->Present(1, 0);
+	// 第1引数(SyncInterval)は「何回の垂直同期を待ってから表示するか」
+	//   1 = モニターのリフレッシュレートに同期する（60Hz なら 60 FPS が上限）
+	//   0 = 待たずに即座に表示する（上限なし）
+	_swapchain->Present(_vsyncEnabled ? 1 : 0, 0);
 }
 
 ComPtr<ID3D12Resource> Dx12Wrapper::CreateTextureFromMemory(const uint8_t* data, size_t size)

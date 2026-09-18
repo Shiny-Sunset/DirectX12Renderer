@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <chrono>
 #include <map>
 #include <tuple>
 
@@ -29,7 +28,18 @@ public:
     GltfActor(const GltfActor&) = delete;
     GltfActor& operator=(const GltfActor&) = delete;
 
-    void Update();
+    // -- 配置 --
+    void SetPosition(const DirectX::XMFLOAT3& pos) { _position = pos; }
+    const DirectX::XMFLOAT3& Position() const { return _position; }
+
+    // Y 軸まわりの向き（ラジアン）
+    void SetRotationY(float radian) { _rotationY = radian; }
+    float RotationY() const { return _rotationY; }
+
+    void SetScale(float scale) { _scale = scale; }
+    float Scale() const { return _scale; }
+
+    void Update(float deltaTime);
 
     // .glb を読み込んで描画に必要なリソースを作る
     bool Init(const std::string& modelPath);
@@ -38,8 +48,12 @@ public:
     void Draw();
 
     // 名前でアニメーションを選んで再生を開始する
+    // @param blendSeconds 前のアニメーションから混ぜながら移行する秒数（0 で即座に切り替え）
     // @return 見つかったら true
-    bool PlayAnimation(const std::string& name);
+    bool PlayAnimation(const std::string& name, float blendSeconds = 0.2f);
+
+    const char* CurrentAnimationName() { return _currentAnimation < 0 ? "(none)" : _animations[_currentAnimation].name.c_str(); }
+    float BlendWeight() { return _prevAnimation < 0 ? 1.0f : 1.0f - _blendRemain / _blendDuration; }
 
     // 輪郭線の描画を切り替える
     void SetOutlineEnabled(bool enabled) { _outlineEnabled = enabled; }
@@ -47,6 +61,12 @@ public:
 
 private:
     template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+
+    DirectX::XMFLOAT3 _position = { 0.0f, 0.0f, 0.0f };
+    float _rotationY = 0.0f;
+    float _scale = 1.0f;
+
+    void UpdateWorldMatrix();   // _position などから world を作って GPU へ書く
 
     // GPU に送る頂点 1 つ分
     // (GltfRenderer のインプットレイアウトと並びを合わせること)
@@ -100,6 +120,14 @@ private:
     // シェーダー側の bones[] の要素数(GltfShaderHeader.hlsli と合わせる)
     static constexpr size_t MaxBoneCount = 256;
 
+    // シェーダーに渡すモデル固有の行列
+    // (GltfShaderHeader.hlsli の cbuffer Transform と並びを合わせること)
+    struct TransformBufferData
+    {
+        DirectX::XMMATRIX world;
+        DirectX::XMMATRIX bones[MaxBoneCount];
+    };
+
     // ノード 1 つ分（アニメーションで TRS を書き換えるので自前で持つ）
     struct Node
     {
@@ -123,7 +151,7 @@ private:
     std::vector<int> _nodeOrder;
 
     ComPtr<ID3D12Resource> _transformBuff;
-    DirectX::XMMATRIX* _mappedTransform = nullptr;    // マップしたまま保持
+    TransformBufferData* _mappedTransform = nullptr;    // マップしたまま保持
 
     // アニメーションのチャンネル 1 本
       // 「あるノードの translation / rotation / scale を時刻で動かす」1 系統
@@ -144,13 +172,29 @@ private:
         std::vector<AnimChannel> channels;
     };
 
+    // アニメーション 1 本を指定時刻でサンプリングして、ノードの配列に書き出す
+    // @param animIndex アニメーション番号
+    // @param timeSec 再生位置（秒）
+    // @param out 書き出し先（バインドポーズで初期化してから上書きする）
+    void SampleAnimation(int animIndex, float timeSec, std::vector<Node>& out) const;
+
+    // 2 つのポーズを混ぜる
+    // @param weight 0 で a、1 で b
+    void BlendNodes(const std::vector<Node>& a, const std::vector<Node>& b,
+        float weight, std::vector<Node>& out) const;
+
     std::vector<Animation> _animations;
     int _currentAnimation = -1;                 // 再生中のアニメーション(-1 = 停止)
-    std::chrono::steady_clock::time_point _startTime;
+    float _animTime = 0.0f;
 
-    // _nodes はバインドポーズ（読み込み後は変更しない）
-    // _animNodes に毎フレーム _nodes をコピーしてから、チャンネルで上書きする
-    std::vector<Node> _animNodes;
+    // -- ブレンド（移行元として残っている、1 つ前のアニメーション） --
+    int _prevAnimation = -1;                    // -1 ならブレンド中ではない
+    float _prevAnimTime = 0.0f;
+    float _blendRemain = 0.0f;                  // 残りの移行時間（秒）
+    float _blendDuration = 0.0f;                // 移行にかける時間（割合の計算に使う）
+
+    std::vector<Node> _animNodes;               // 最終的なポーズ
+    std::vector<Node> _blendNodes;              // 移行元のポーズ（作業用）
 
     bool LoadAnimations(const cgltf_data* data);
     void ApplyAnimation(float timeSec);         // _animNodes を書き換える

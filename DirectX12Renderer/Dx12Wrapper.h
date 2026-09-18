@@ -29,9 +29,6 @@ public:
 	// @return 成功したら true
 	bool Init(HWND hwnd, int windowWidth, int windowHeight);
 
-	// シーンの更新(モデルの回転)
-	void Update();
-
 	// 描画開始
 	// リソースバリア、レンダーターゲットと深度バッファの設定、クリア、
 	// ビューポートとシザー矩形の設定まで行う
@@ -43,6 +40,12 @@ public:
 
 	// 画面のスワップ(フリップ)
 	void Flip();
+
+	// 垂直同期(VSync)の切り替え
+	  // 切ると画面の更新を待たなくなり、フレームレートの上限が外れる
+	  // (デルタタイムが効いているかの確認用。通常は有効のままにする)
+	void SetVSyncEnabled(bool enabled) { _vsyncEnabled = enabled; }
+	bool IsVSyncEnabled() const { return _vsyncEnabled; }
 
 	// シーン用定数バッファ(b0)のビューを、指定されたハンドルの位置に作る
 	// CBV_SRV_UAV のディスクリプタヒープは同時に 1 本しかバインドできないため、
@@ -81,6 +84,13 @@ public:
 	// @param nearZ 近クリップ面
 	// @param farZ 遠クリップ面
 	void SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& target,float nearZ, float farZ);
+	
+	// シーン用定数バッファ(b0)の GPU 側アドレス
+	  // ルートディスクリプタとして直接渡すときに使う
+	D3D12_GPU_VIRTUAL_ADDRESS SceneConstantBufferAddress() const
+	{
+		return _sceneConstBuff->GetGPUVirtualAddress();
+	}
 
 private:
 	// ヘッダーのグローバルスコープに using 宣言を置くと、
@@ -91,7 +101,6 @@ private:
 	// (BasicShaderHeader.hlsli の cbuff0 と並びを合わせること)
 	struct SceneMatrix
 	{
-		DirectX::XMMATRIX world;	// ワールド行列
 		DirectX::XMMATRIX view;		// ビュー行列(スフィアマップ用にビュー空間の法線を求めるのに使う)
 		DirectX::XMMATRIX proj;		// プロジェクション行列
 		DirectX::XMFLOAT3 eye;		// 視点座標
@@ -137,7 +146,8 @@ private:
 	// -- シーン用定数バッファ --
 	ComPtr<ID3D12Resource> _sceneConstBuff;
 	SceneMatrix* _mappedScene = nullptr;	// _sceneConstBuff のマップ先(Unmap はデストラクタで行う)
-	float _angle = 0.0f;					// モデルの回転角
+
+	bool _vsyncEnabled = true;   // 垂直同期を待つか
 
 	// -- テクスチャ --
 	ComPtr<ID3D12Resource> _whiteTex;
