@@ -226,6 +226,8 @@ void Application::Run()
 		_ground->Draw();
 		_gltfRenderer->BeforeDraw();
 		_gltfActor->Draw();
+		_dx12->EndOffscreenPass();
+
 
 		// -- 2 パス目：テクスチャを画面へ --
 		_dx12->BeginBackBufferPass();
