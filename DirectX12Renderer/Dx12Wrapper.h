@@ -32,7 +32,15 @@ public:
 	// 描画開始
 	// リソースバリア、レンダーターゲットと深度バッファの設定、クリア、
 	// ビューポートとシザー矩形の設定まで行う
-	void BeginDraw();
+
+	// 1 パス目：オフスクリーンのテクスチャへ描き始める
+	void BeginOffscreenPass();
+
+	// 1 パス目の終了（テクスチャとして読める状態へ戻す）
+	void EndOffscreenPass();
+
+	// 2 パス目：バックバッファへ描き始める
+	void BeginBackBufferPass();
 
 	// 描画終了
 	// リソースバリア、コマンドリストのクローズと実行、GPU の完了待ち、リセットまで行う
@@ -58,6 +66,7 @@ public:
 	ID3D12GraphicsCommandList* CommandList() const { return _cmdList.Get(); }
 	ID3D12CommandQueue* CommandQueue() const { return _cmdQueue.Get(); }
 	IDXGISwapChain4* Swapchain() const { return _swapchain.Get(); }
+	ID3D12DescriptorHeap* PeraSrvHeap() const { return _peraSRVHeap.Get(); }
 
 	// -- テクスチャ --
 	// テクスチャをファイルから読み込む
@@ -114,6 +123,7 @@ private:
 	bool CreateDepthBuffer();
 	bool CreateSceneConstantBuffer();
 	bool CreateDefaultTextures();
+	bool CreatePeraResources();
 
 	// 既定テクスチャの生成
 	ComPtr<ID3D12Resource> CreateWhiteTexture();
@@ -139,6 +149,9 @@ private:
 	ComPtr<ID3D12DescriptorHeap> _rtvHeaps;
 	std::vector<ComPtr<ID3D12Resource>> _backBuffers;
 
+	ComPtr<ID3D12DescriptorHeap> _peraRTVHeap;
+	ComPtr<ID3D12DescriptorHeap> _peraSRVHeap;
+
 	// -- 深度バッファ --
 	ComPtr<ID3D12Resource> _depthBuffer;
 	ComPtr<ID3D12DescriptorHeap> _dsvHeap;
@@ -153,6 +166,8 @@ private:
 	ComPtr<ID3D12Resource> _whiteTex;
 	ComPtr<ID3D12Resource> _blackTex;
 	ComPtr<ID3D12Resource> _gradTex;
+
+	ComPtr<ID3D12Resource> _peraResource;
 
 	// ファイル名パスとリソースのマップテーブル
 	std::unordered_map<std::string, ComPtr<ID3D12Resource>> _resourceTable;

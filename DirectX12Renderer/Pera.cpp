@@ -1,14 +1,14 @@
-﻿#include "Ground.h"
+﻿#include "Pera.h"
 #include "Util.h"
 #include "Dx12Wrapper.h"
 #include <d3dcompiler.h>
 
-Ground::Ground(Dx12Wrapper& dx12)
+Pera::Pera(Dx12Wrapper& dx12)
     : _dx12(dx12)
 {
 }
 
-bool Ground::Init()
+bool Pera::Init()
 {
     if (!CompileShaders()) return false;
     if (!CreateVertexBuffer()) return false;
@@ -18,62 +18,65 @@ bool Ground::Init()
     return true;
 }
 
-bool Ground::CompileShaders()
+bool Pera::CompileShaders()
 {
     ComPtr<ID3DBlob> errorBlob;
 
-    // GroundVertexShader の設定
+    // PeraVertexShader の設定
     auto result = D3DCompileFromFile(
-        L"GroundVertexShader.hlsl",	// シェーダー名
+        L"PeraVertexShader.hlsl",	// シェーダー名
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "GroundVS", "vs_5_0",	// 関数は GroundVS、対象シェーダーは vs_5_0
+        "PeraVS", "vs_5_0",	// 関数は PeraVS、対象シェーダーは vs_5_0
         D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
         0,
         &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
     );
-    if (!CheckShaderResult(result, errorBlob.Get(), "GroundVertexShader")) return false;
+    if (!CheckShaderResult(result, errorBlob.Get(), "PeraVertexShader")) return false;
 
     errorBlob.Reset();
 
-    // GroundPixelShaderの設定
+    // PeraPixelShaderの設定
     result = D3DCompileFromFile(
-        L"GroundPixelShader.hlsl",	// シェーダー名
+        L"PeraPixelShader.hlsl",	// シェーダー名
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "GroundPS", "ps_5_0",	// 関数は GroundPS、対象シェーダーは ps_5_0
+        "PeraPS", "ps_5_0",	// 関数は PeraPS、対象シェーダーは ps_5_0
         D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
         0,
         &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
     );
-    if (!CheckShaderResult(result, errorBlob.Get(), "GroundPixelShader")) return false;
+    if (!CheckShaderResult(result, errorBlob.Get(), "PeraPixelShader")) return false;
 
     return true;
 }
 
-void Ground::Draw()
+void Pera::Draw()
 {
     auto cmdList = _dx12.CommandList();
 
     cmdList->SetPipelineState(_pipelineState.Get());
     cmdList->SetGraphicsRootSignature(_rootSignature.Get());
 
-    // ヒープを介さず、定数バッファのアドレスを直接渡す
-    cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
+    auto peraHeap = _dx12.PeraSrvHeap();
+    ID3D12DescriptorHeap* heaps[] = { peraHeap };
+    cmdList->SetDescriptorHeaps(1, heaps);
+
+    // ルートパラメーター 0 番に、ヒープの先頭(= 1 パス目の描画結果)を割り当てる
+    cmdList->SetGraphicsRootDescriptorTable(0, peraHeap->GetGPUDescriptorHandleForHeapStart());
 
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     cmdList->IASetVertexBuffers(0, 1, &_vbView);
     cmdList->DrawInstanced(4, 1, 0, 0);
 }
 
-bool Ground::CreateVertexBuffer()
+bool Pera::CreateVertexBuffer()
 {
-    constexpr float half = 50.0f * 0.5f;   // GroundSize = 50.0f
-    const Vertex vertices[] = {
-            {{ -half, 0.0f, -half }},
-            {{ -half, 0.0f,  half }},
-            {{  half, 0.0f, -half }},
-            {{  half, 0.0f,  half }},
+    PeraVertex pv[4] = {
+        {{-1, -1, 0.1}, {0, 1}},
+        {{-1,  1, 0.1}, {0, 0}},
+        {{ 1, -1, 0.1}, {1, 1}},
+        {{ 1,  1, 0.1}, {1, 0}}
     };
 
     auto device = _dx12.Device();
@@ -90,7 +93,7 @@ bool Ground::CreateVertexBuffer()
     D3D12_RESOURCE_DESC resdesc = {};
 
     resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resdesc.Width = sizeof(vertices);	// 頂点情報が入るだけのサイズ
+    resdesc.Width = sizeof(pv);	// 頂点情報が入るだけのサイズ
     resdesc.Height = 1;
     resdesc.DepthOrArraySize = 1;
     resdesc.MipLevels = 1;
@@ -110,38 +113,61 @@ bool Ground::CreateVertexBuffer()
     if (!CheckResult(result, "CreateCommittedResource _vertBuff")) return false;
 
     // 頂点情報のコピー(マップ)
-    Vertex* vertMap = nullptr;
+    PeraVertex* vertMap = nullptr;
     result = _vertBuff->Map(0, nullptr, (void**)&vertMap);
     if (!CheckResult(result, "_vertBuff->Map")) return false;
 
-    std::copy(std::begin(vertices), std::end(vertices), vertMap);
+    std::copy(std::begin(pv), std::end(pv), vertMap);
     _vertBuff->Unmap(0, nullptr);	// マップの解除
 
     // 頂点バッファビューの作成
     // バッファ全体を「何バイトごとの頂点の列」として解釈する
     _vbView.BufferLocation = _vertBuff->GetGPUVirtualAddress();	// バッファの仮想アドレス
-    _vbView.SizeInBytes = sizeof(vertices);	// 全体のバイト数
-    _vbView.StrideInBytes = sizeof(Vertex);	// 1頂点あたりのバイト数
+    _vbView.SizeInBytes = sizeof(pv);	// 全体のバイト数
+    _vbView.StrideInBytes = sizeof(PeraVertex);	// 1頂点あたりのバイト数
 
     return true;
 }
 
-bool Ground::CreateRootSignature()
+bool Pera::CreateRootSignature()
 {
+    // ディスクリプタレンジの作成
+    D3D12_DESCRIPTOR_RANGE descTblRange = {};
+
+    // t0: テクスチャ
+    descTblRange.NumDescriptors = 1;
+    descTblRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descTblRange.BaseShaderRegister = 0;
+    descTblRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
     // ルートパラメーター(ディスクリプタテーブル)の作成
     D3D12_ROOT_PARAMETER rootParam = {};
-    rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;   // ディスクリプタテーブルではない
-    rootParam.Descriptor.ShaderRegister = 0;                   // b0
-    rootParam.Descriptor.RegisterSpace = 0;
-    rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParam.DescriptorTable.pDescriptorRanges = &descTblRange;
+    rootParam.DescriptorTable.NumDescriptorRanges = 1;
+    rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // サンプラーの作成
+    D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+
+    samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;        // 線形補間する
+    samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+    samplerDesc.MinLOD = 0.0f;
+    samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    samplerDesc.ShaderRegister = 0;
 
     // ルートシグネチャの作成
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
     rootSignatureDesc.pParameters = &rootParam;	// ルートパラメーターの先頭アドレス
     rootSignatureDesc.NumParameters = 1;	// ルートパラメーター数
-    rootSignatureDesc.pStaticSamplers = nullptr;
-    rootSignatureDesc.NumStaticSamplers = 0;
+    rootSignatureDesc.pStaticSamplers = &samplerDesc;
+    rootSignatureDesc.NumStaticSamplers = 1;
 
     // バイナリコードの作成
     ComPtr<ID3DBlob> rootSigBlob;
@@ -167,13 +193,17 @@ bool Ground::CreateRootSignature()
     return true;
 }
 
-bool Ground::CreatePipelineState()
+bool Pera::CreatePipelineState()
 {
     // -- 頂点レイアウト(インプットレイアウト)の作成 --
     D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
         {
             // 座標情報
             "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+        },
+        {
+            // uv
+            "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
         },
     };
 
@@ -188,11 +218,9 @@ bool Ground::CreatePipelineState()
     gpipeline.PS.BytecodeLength = _psBlob->GetBufferSize();
 
     // 深度バッファ関連の設定
-    gpipeline.DepthStencilState.DepthEnable = true;	// 深度バッファを使う
-    gpipeline.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;	// 書き込む
-    gpipeline.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;	// 小さい方を使う
+    gpipeline.DepthStencilState.DepthEnable = false;	// 深度バッファを使う
 
-    gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    gpipeline.DSVFormat = DXGI_FORMAT_UNKNOWN;
 
     // サンプルマスクの設定
     gpipeline.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;	// デフォルトのサンプルマスクを表す定数

@@ -8,6 +8,7 @@
 #include "imgui_impl_win32.h"
 #include "imgui.h"
 #include "Ground.h"
+#include "Pera.h"
 #include <tchar.h>
 #include <iostream>
 #include <algorithm>
@@ -21,7 +22,7 @@ namespace
 	constexpr int window_height = 1080;
 
 	// 読み込むモデル
-	const char* const model_path = "Model/初音ミク.pmd";
+	const char* const model_path = "Model/DangoGirl.glb";
 	// 読み込むモーション
 	const char* const motion_path = "motion/motion.vmd";
 
@@ -131,6 +132,10 @@ bool Application::Init()
 	_ground = std::make_unique<Ground>(*_dx12);
 	if (!_ground->Init()) return false;
 
+	// -- マルチパスレンダリング用の板ポリの作成 --
+	_pera = std::make_unique<Pera>(*_dx12);
+	if (!_pera->Init()) return false;
+
 	/*
 	_pmdRenderer = std::make_unique<PMDRenderer>(*_dx12);
 	if (!_pmdRenderer->Init()) return false;
@@ -138,7 +143,7 @@ bool Application::Init()
 
 	// -- モデルの読み込み --
 	_gltfActor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer);
-	if (!_gltfActor->Init("Model/DangoGirl.glb")) return false;
+	if (!_gltfActor->Init(model_path)) return false;
 	/*
 	_pmdActor = std::make_unique<PMDActor>(*_dx12);
 	if (!_pmdActor->Init(model_path)) return false;
@@ -214,15 +219,18 @@ void Application::Run()
 		_debugUI->EndFrame();
 
 		// -- 描画処理 --
-		_dx12->BeginDraw();
+		// -- 1 パス目：シーンをテクスチャへ --
+		_dx12->BeginOffscreenPass();
 		//_pmdRenderer->BeforeDraw();
 		//_pmdActor->Draw
 		_ground->Draw();
 		_gltfRenderer->BeforeDraw();
 		_gltfActor->Draw();
 
-		_debugUI->Draw();
-
+		// -- 2 パス目：テクスチャを画面へ --
+		_dx12->BeginBackBufferPass();
+		_pera->Draw();        // 画面いっぱいの板ポリ
+		_debugUI->Draw();     // UI は効果の影響を受けない
 		_dx12->EndDraw();
 		_dx12->Flip();
 	}

@@ -81,6 +81,7 @@ bool Dx12Wrapper::Init(HWND hwnd, int windowWidth, int windowHeight)
 	if (!InitializeCommand()) return false;
 	if (!CreateSwapChain(hwnd)) return false;
 	if (!CreateFinalRenderTargets()) return false;
+	if (!CreatePeraResources()) return false;
 	if (!CreateDepthBuffer()) return false;
 	if (!CreateSceneConstantBuffer()) return false;
 	if (!CreateDefaultTextures()) return false;
@@ -275,6 +276,85 @@ bool Dx12Wrapper::CreateFinalRenderTargets()
 	return true;
 }
 
+bool Dx12Wrapper::CreatePeraResources()
+{
+	// 作成済みのヒープ情報を使ってもう 1 枚作る
+	auto heapDesc = _rtvHeaps->GetDesc();
+
+	// 使っているバックバッファーの情報を利用する
+	auto& bbuff = _backBuffers[0];
+	auto resDesc = bbuff->GetDesc();
+
+	D3D12_HEAP_PROPERTIES heapProp = {};
+	heapProp.Type = D3D12_HEAP_TYPE_DEFAULT;
+	heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+	// レンダリング時のクリア値と同じ値
+	float clsClr[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	D3D12_CLEAR_VALUE clearValue = {};
+	clearValue.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	clearValue.Color[0] = clsClr[0];
+	clearValue.Color[1] = clsClr[1];
+	clearValue.Color[2] = clsClr[2];
+	clearValue.Color[3] = clsClr[3];
+
+	auto result = _dev->CreateCommittedResource(
+		&heapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		&clearValue,
+		IID_PPV_ARGS(_peraResource.ReleaseAndGetAddressOf())
+	);
+	if (!CheckResult(result, "CreateCommittedResource _peraResource.ReleaseAndGetAddressOf()")) return false;
+
+	// RTV 用ヒープを作る
+	heapDesc.NumDescriptors = 1;
+	result = _dev->CreateDescriptorHeap(
+		&heapDesc,
+		IID_PPV_ARGS(_peraRTVHeap.ReleaseAndGetAddressOf())
+	);
+	if (!CheckResult(result, "CreateDescriptorHeap _peraRTVHeap.ReleaseAndGetAddressOf()")) return false;
+
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+	rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
+	// RTV を作る
+	_dev->CreateRenderTargetView(
+		_peraResource.Get(),
+		&rtvDesc,
+		_peraRTVHeap->GetCPUDescriptorHandleForHeapStart()
+	);
+
+	// SRV 用ヒープを作る
+	heapDesc.NumDescriptors = 1;
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+	result = _dev->CreateDescriptorHeap(
+		&heapDesc,
+		IID_PPV_ARGS(_peraSRVHeap.ReleaseAndGetAddressOf())
+	);
+	if (!CheckResult(result, "CreateDescriptorHeap _peraSRVHeap.ReleaseAndGetAddressOf()")) return false;
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Format = rtvDesc.Format;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	// SRV を作る
+	_dev->CreateShaderResourceView(
+		_peraResource.Get(),
+		&srvDesc,
+		_peraSRVHeap->GetCPUDescriptorHandleForHeapStart()
+	);
+
+	return true;
+}
+
 bool Dx12Wrapper::CreateDepthBuffer()
 {
 	// 深度バッファの作成
@@ -414,37 +494,52 @@ void Dx12Wrapper::CreateSceneConstantBufferView(D3D12_CPU_DESCRIPTOR_HANDLE hand
 	_dev->CreateConstantBufferView(&matrixCBVDesc, handle);
 }
 
-void Dx12Wrapper::BeginDraw()
+void Dx12Wrapper::BeginOffscreenPass()
 {
-	// 現在のバックバッファ(描画対象)の番号を取得
+	// テクスチャとして読める状態 → 描き込める状態へ
+	_barrierDesc.Transition.pResource = _peraResource.Get();
+	_barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	_barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	_cmdList->ResourceBarrier(1, &_barrierDesc);
+
+	auto rtvH = _peraRTVHeap->GetCPUDescriptorHandleForHeapStart();
+	auto dsvH = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	_cmdList->OMSetRenderTargets(1, &rtvH, true, &dsvH);   // 深度バッファは使い回す
+
+	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+	_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	_cmdList->RSSetViewports(1, &_viewport);
+	_cmdList->RSSetScissorRects(1, &_scissorrect);
+}
+
+void Dx12Wrapper::EndOffscreenPass()
+{
+	// 描き込める状態 → テクスチャとして読める状態へ
+	_barrierDesc.Transition.pResource = _peraResource.Get();
+	_barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	_barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	_cmdList->ResourceBarrier(1, &_barrierDesc);
+}
+
+void Dx12Wrapper::BeginBackBufferPass()
+{
 	_currentBackBufferIdx = _swapchain->GetCurrentBackBufferIndex();
 
-	// 描画対象のRTVのハンドルを求める
 	auto rtvH = _rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 	rtvH.ptr += _currentBackBufferIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
-	// リソースバリアの指定
-	_barrierDesc.Transition.pResource = _backBuffers[_currentBackBufferIdx].Get();	// バックバッファリソース
-	_barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;	// 直前はPRESENT状態
-	_barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;	// 今からレンダーターゲット状態
-	_cmdList->ResourceBarrier(1, &_barrierDesc);	// バリア指定実行
+	_barrierDesc.Transition.pResource = _backBuffers[_currentBackBufferIdx].Get();
+	_barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+	_barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	_cmdList->ResourceBarrier(1, &_barrierDesc);
 
-	// レンダーターゲットと深度バッファビューを指定
-	auto dsvH = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
-	_cmdList->OMSetRenderTargets(1, &rtvH, true, &dsvH);
+	// 深度バッファは指定しない（画面いっぱいの板を 1 枚描くだけなので不要）
+	_cmdList->OMSetRenderTargets(1, &rtvH, false, nullptr);
 
-	// 画面クリア
-	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };	// 白色
+	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
-
-	// 深度バッファのクリア(描画前に最大値で埋めておく)
-	_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-	// ビューポートの設定
-	_cmdList->RSSetViewports(1, &_viewport);
-
-	// シザー矩形の設定
-	_cmdList->RSSetScissorRects(1, &_scissorrect);
 }
 
 void Dx12Wrapper::EndDraw()

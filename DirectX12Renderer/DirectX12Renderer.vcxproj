@@ -157,6 +157,7 @@
     <ClCompile Include="GltfActor.cpp" />
     <ClCompile Include="GltfRenderer.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Pera.cpp" />
     <ClCompile Include="PMDActor.cpp" />
     <ClCompile Include="PMDRenderer.cpp" />
     <ClCompile Include="Util.cpp" />
@@ -197,6 +198,7 @@
     <ClInclude Include="External\imgui\imstb_truetype.h" />
     <ClInclude Include="External\imgui\backends\imgui_impl_dx12.h" />
     <ClInclude Include="External\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="Pera.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
@@ -252,6 +254,9 @@
     <None Include="GltfOutlinePixelShader.hlsl" />
     <None Include="GroundVertexShader.hlsl" />
     <None Include="GroundPixelShader.hlsl" />
+    <None Include="PeraShaderHeader.hlsli" />
+    <None Include="PeraVertexShader.hlsl" />
+    <None Include="PeraPixelShader.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -5,17 +5,17 @@
 
 class Dx12Wrapper;
 
-class Ground
+class Pera
 {
 public:
-    explicit Ground(Dx12Wrapper& dx12);
-    ~Ground() = default;
+    explicit Pera(Dx12Wrapper& dx12);
+    ~Pera() = default;
 
-    Ground(const Ground&) = delete;
-    Ground& operator=(const Ground&) = delete;
+    Pera(const Pera&) = delete;
+    Pera& operator=(const Pera&) = delete;
 
     bool Init();
-    void Draw();   // Dx12Wrapper::BeginBackBufferPass と EndDraw の間で呼ぶ
+    void Draw();   // Dx12Wrapper::BeginBackBufferPass() と EndDraw の間で呼ぶ
 
 private:
     template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
@@ -23,7 +23,11 @@ private:
     // シェーダーのコンパイル
     bool CompileShaders();
 
-    struct Vertex { DirectX::XMFLOAT3 pos; };   // 位置だけ
+    struct PeraVertex
+    {
+        DirectX::XMFLOAT3 pos;
+        DirectX::XMFLOAT2 uv;
+    };
 
     bool CreateVertexBuffer();
     bool CreateRootSignature();

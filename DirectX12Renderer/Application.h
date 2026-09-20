@@ -12,6 +12,7 @@ class GltfRenderer;
 class GltfActor;
 class DebugUI;
 class Ground;
+class Pera;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -67,6 +68,7 @@ private:
 	std::unique_ptr<GltfRenderer> _gltfRenderer;
 	std::unique_ptr<GltfActor> _gltfActor;
 	std::unique_ptr<Ground> _ground;
+	std::unique_ptr<Pera> _pera;
 	GameTimer _timer;
 	Input _input;
 	Camera _camera;
