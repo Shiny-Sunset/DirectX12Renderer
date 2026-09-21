@@ -58,8 +58,12 @@ void Ground::Draw()
     cmdList->SetPipelineState(_pipelineState.Get());
     cmdList->SetGraphicsRootSignature(_rootSignature.Get());
 
-    // ヒープを介さず、定数バッファのアドレスを直接渡す
     cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
+
+    auto shadowHeap = _dx12.ShadowSrvHeap();
+    ID3D12DescriptorHeap* heaps[] = { shadowHeap };
+    cmdList->SetDescriptorHeaps(1, heaps);
+    cmdList->SetGraphicsRootDescriptorTable(1, shadowHeap->GetGPUDescriptorHandleForHeapStart());
 
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     cmdList->IASetVertexBuffers(0, 1, &_vbView);
@@ -128,20 +132,50 @@ bool Ground::CreateVertexBuffer()
 
 bool Ground::CreateRootSignature()
 {
+    // ディスクリプタレンジの作成
+    D3D12_DESCRIPTOR_RANGE descTblRange = {};
+
+    // t0: シャドウマップ用テクスチャ
+    descTblRange.NumDescriptors = 1;
+    descTblRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descTblRange.BaseShaderRegister = 0;
+    descTblRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
     // ルートパラメーター(ディスクリプタテーブル)の作成
-    D3D12_ROOT_PARAMETER rootParam = {};
-    rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;   // ディスクリプタテーブルではない
-    rootParam.Descriptor.ShaderRegister = 0;                   // b0
-    rootParam.Descriptor.RegisterSpace = 0;
-    rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    D3D12_ROOT_PARAMETER rootParam[2] = {};
+
+    // 0 番: シーンの定数バッファ(b0)
+    rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParam[0].Descriptor.ShaderRegister = 0;
+    rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    // 1 番: シャドウマップ(t0)。ピクセルシェーダーで読む
+    rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rootParam[1].DescriptorTable.pDescriptorRanges = &descTblRange;
+    rootParam[1].DescriptorTable.NumDescriptorRanges = 1;
+    rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    // サンプラーの作成
+    D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+
+    samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+    samplerDesc.Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+    samplerDesc.MaxLOD = D3D12_FLOAT32_MAX;
+    samplerDesc.MinLOD = 0.0f;
+    samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    samplerDesc.ShaderRegister = 0;
 
     // ルートシグネチャの作成
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
     rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-    rootSignatureDesc.pParameters = &rootParam;	// ルートパラメーターの先頭アドレス
-    rootSignatureDesc.NumParameters = 1;	// ルートパラメーター数
-    rootSignatureDesc.pStaticSamplers = nullptr;
-    rootSignatureDesc.NumStaticSamplers = 0;
+    rootSignatureDesc.pParameters = rootParam;	// ルートパラメーターの先頭アドレス
+    rootSignatureDesc.NumParameters = 2;	// ルートパラメーター数
+    rootSignatureDesc.pStaticSamplers = &samplerDesc;
+    rootSignatureDesc.NumStaticSamplers = 1;
 
     // バイナリコードの作成
     ComPtr<ID3DBlob> rootSigBlob;

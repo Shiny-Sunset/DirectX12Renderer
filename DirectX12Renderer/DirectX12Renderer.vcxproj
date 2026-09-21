@@ -252,8 +252,10 @@
     <None Include="GltfPixelShader.hlsl" />
     <None Include="GltfOutlineVertexShader.hlsl" />
     <None Include="GltfOutlinePixelShader.hlsl" />
+    <None Include="GroundShaderHeader.hlsli" />
     <None Include="GroundVertexShader.hlsl" />
     <None Include="GroundPixelShader.hlsl" />
+    <None Include="GltfShadowVertexShader.hlsl" />
     <None Include="PeraShaderHeader.hlsli" />
     <None Include="PeraVertexShader.hlsl" />
     <None Include="PeraPixelShader.hlsl" />

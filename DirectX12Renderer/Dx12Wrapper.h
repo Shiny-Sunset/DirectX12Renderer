@@ -33,6 +33,9 @@ public:
 	// リソースバリア、レンダーターゲットと深度バッファの設定、クリア、
 	// ビューポートとシザー矩形の設定まで行う
 
+	void BeginShadowPass();   // シャドウマップへ描き始める
+	void EndShadowPass();     // テクスチャとして読める状態へ戻す
+
 	// 1 パス目：オフスクリーンのテクスチャへ描き始める
 	void BeginOffscreenPass();
 
@@ -67,6 +70,7 @@ public:
 	ID3D12CommandQueue* CommandQueue() const { return _cmdQueue.Get(); }
 	IDXGISwapChain4* Swapchain() const { return _swapchain.Get(); }
 	ID3D12DescriptorHeap* PeraSrvHeap() const { return _peraSRVHeap.Get(); }
+	ID3D12DescriptorHeap* ShadowSrvHeap() const { return _shadowSRVHeap.Get(); }
 
 	// -- テクスチャ --
 	// テクスチャをファイルから読み込む
@@ -94,6 +98,17 @@ public:
 	// @param farZ 遠クリップ面
 	void SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& target,float nearZ, float farZ);
 	
+	void UpdateLightCamera(const DirectX::XMFLOAT3& center);
+
+	void SetLightVec(const DirectX::XMFLOAT3& v) { _lightVec = v;}
+	const DirectX::XMFLOAT3& LightVec() const { return _lightVec; }
+
+	void SetShadowArea(float area) { _shadowArea = area; }
+	float ShadowArea() const { return _shadowArea; }
+
+	void SetLightDistance(float d) { _lightDistance = d; }
+	float LightDistance() const { return _lightDistance; }
+
 	// シーン用定数バッファ(b0)の GPU 側アドレス
 	  // ルートディスクリプタとして直接渡すときに使う
 	D3D12_GPU_VIRTUAL_ADDRESS SceneConstantBufferAddress() const
@@ -112,7 +127,11 @@ private:
 	{
 		DirectX::XMMATRIX view;		// ビュー行列(スフィアマップ用にビュー空間の法線を求めるのに使う)
 		DirectX::XMMATRIX proj;		// プロジェクション行列
+		DirectX::XMMATRIX lightCamera;   // 光源から見たビュー×プロジェクション
 		DirectX::XMFLOAT3 eye;		// 視点座標
+		float _pad0;                     // パディング
+		DirectX::XMFLOAT3 lightVec;      // 光が進む向き
+		float _pad1;
 	};
 
 	// -- 初期化のサブルーチン --
@@ -124,6 +143,7 @@ private:
 	bool CreateSceneConstantBuffer();
 	bool CreateDefaultTextures();
 	bool CreatePeraResources();
+	bool CreateShadowMap();
 
 	// 既定テクスチャの生成
 	ComPtr<ID3D12Resource> CreateWhiteTexture();
@@ -149,9 +169,6 @@ private:
 	ComPtr<ID3D12DescriptorHeap> _rtvHeaps;
 	std::vector<ComPtr<ID3D12Resource>> _backBuffers;
 
-	ComPtr<ID3D12DescriptorHeap> _peraRTVHeap;
-	ComPtr<ID3D12DescriptorHeap> _peraSRVHeap;
-
 	// -- 深度バッファ --
 	ComPtr<ID3D12Resource> _depthBuffer;
 	ComPtr<ID3D12DescriptorHeap> _dsvHeap;
@@ -167,7 +184,20 @@ private:
 	ComPtr<ID3D12Resource> _blackTex;
 	ComPtr<ID3D12Resource> _gradTex;
 
+	// マルチパスレンダリング用のテクスチャ
 	ComPtr<ID3D12Resource> _peraResource;
+	ComPtr<ID3D12DescriptorHeap> _peraRTVHeap;
+	ComPtr<ID3D12DescriptorHeap> _peraSRVHeap;
+
+	// シャドウマップ
+	ComPtr<ID3D12Resource> _shadowMap;
+	ComPtr<ID3D12DescriptorHeap> _shadowDSVHeap;
+	ComPtr<ID3D12DescriptorHeap> _shadowSRVHeap;
+	static constexpr UINT ShadowMapSize = 2048;
+	float _lightDistance = 20.0f;
+	float _shadowArea = 15.0f;
+	// -- 平行光源 --
+	DirectX::XMFLOAT3 _lightVec = { 1.0f, -1.0f, 1.0f };   // 光が進む向き（斜め上から）
 
 	// ファイル名パスとリソースのマップテーブル
 	std::unordered_map<std::string, ComPtr<ID3D12Resource>> _resourceTable;

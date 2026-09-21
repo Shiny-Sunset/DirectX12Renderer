@@ -6,7 +6,7 @@ float4 GltfPS(Output input) : SV_TARGET
     static const float steps = 4.0; // 階調の数（2〜4 くらい）
     static const float shadowLevel = 0.4; // 影側の明るさ（0 = 真っ黒）
 
-    float3 light = normalize(float3(1, -1, 1)); // 光が進む向き
+    float3 light = normalize(lightVec); // 光が進む向き
     float3 normal = normalize(input.normal);
 
     float4 texColor = baseColorTex.Sample(smp, input.uv);

@@ -151,8 +151,8 @@ void GltfActor::Draw()
 	
 	// プリミティブごとに、担当する範囲だけを描く
 	// 0 周目: 輪郭線
-	  // 押し出したシェルの裏面を描き、本体で覆われなかった縁だけが線として残る
-	  // 半透明マテリアルは面の縁が出てしまうため除外する
+	// 押し出したメッシュの裏面を描き、本体で覆われなかった縁だけが線として残る
+	// 半透明マテリアルは面の縁が出てしまうため除外する
 	if (_outlineEnabled)
 	{
 		cmdList->SetPipelineState(_renderer.OutlinePipelineState());
@@ -196,6 +196,31 @@ void GltfActor::Draw()
 		cmdList->DrawIndexedInstanced(
 			p.indexCount, 1, p.startIndexLocation, p.baseVertexLocation, 0
 		);
+	}
+}
+
+void GltfActor::DrawShadow()
+{
+	auto cmdList = _dx12.CommandList();
+
+	cmdList->SetPipelineState(_renderer.ShadowPipelineState());
+	cmdList->SetGraphicsRootSignature(_renderer.RootSignature());
+
+	ID3D12DescriptorHeap* heaps[] = { _descHeap.Get() };
+	cmdList->SetDescriptorHeaps(1, heaps);
+
+	// b0(シーン) と b1(ボーン) だけ渡す。マテリアルとテクスチャは要らない
+	cmdList->SetGraphicsRootDescriptorTable(0, _descHeap->GetGPUDescriptorHandleForHeapStart());
+
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmdList->IASetVertexBuffers(0, 1, &_vbView);
+	cmdList->IASetIndexBuffer(&_ibView);
+
+	// 全プリミティブをまとめて描く（半透明は影を落とさない方が自然なので除外）
+	for (const auto& prim : _primitives)
+	{
+		if (prim.isBlend) continue;
+		cmdList->DrawIndexedInstanced(prim.indexCount, 1, prim.startIndexLocation, prim.baseVertexLocation, 0);
 	}
 }
 
@@ -557,7 +582,7 @@ bool GltfActor::LoadAnimations(const cgltf_data* data)
 void GltfActor::BuildSmoothNormals(std::vector<Vertex>& vertices)
 {
 	// フラットシェーディングのモデルは、同じ座標に複数の法線が割り当てられている。
-	// そのまま押し出すと輪郭線のシェルが継ぎ目で裂けるため、
+	// そのまま押し出すと輪郭線のメッシュが継ぎ目で裂けるため、
 	// 位置ごとに法線を平均したものを別に持たせる。
 	// (シェーディング用の normal は変更しないので、見た目のフラット感は保たれる)
 

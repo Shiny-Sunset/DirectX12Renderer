@@ -207,6 +207,8 @@ void Application::Run()
 		_gltfActor->Update(dt);
 		//_pmdActor->Update();
 
+		_dx12->UpdateLightCamera(_gltfActor->Position());
+
 		if (!_debugUI->WantCaptureMouse())
 		{
 			_camera.Update(_input, dt, _gltfActor->Position());
@@ -219,6 +221,11 @@ void Application::Run()
 		_debugUI->EndFrame();
 
 		// -- 描画処理 --
+		// -- 0 パス目：影 --
+		_dx12->BeginShadowPass();
+		_gltfActor->DrawShadow();
+		_dx12->EndShadowPass();
+		
 		// -- 1 パス目：シーンをテクスチャへ --
 		_dx12->BeginOffscreenPass();
 		//_pmdRenderer->BeforeDraw();
@@ -281,6 +288,36 @@ void Application::BuildDebugUI()
 	if (ImGui::Checkbox("VSync", &vsync))
 	{
 		_dx12->SetVSyncEnabled(vsync);
+	}
+
+	ImGui::Separator();
+	ImGui::Text("Light");
+
+	static float azimuthDeg = 45.0f;     // 水平方向の向き
+	static float elevationDeg = 45.0f;   // 高さ方向の角度
+
+	bool lightChanged = false;
+	lightChanged |= ImGui::SliderFloat("Azimuth", &azimuthDeg, -180.0f, 180.0f);
+	lightChanged |= ImGui::SliderFloat("Elevation", &elevationDeg, 5.0f, 89.0f);
+
+	if (lightChanged)
+	{
+		const float az = DirectX::XMConvertToRadians(azimuthDeg);
+		const float el = DirectX::XMConvertToRadians(elevationDeg);
+
+		// 光が「進む」向きなので、下向き(-Y)を基本にする
+		DirectX::XMFLOAT3 dir;
+		dir.x = cosf(el) * sinf(az);
+		dir.y = -sinf(el);
+		dir.z = cosf(el) * cosf(az);
+
+		_dx12->SetLightVec(dir);
+	}
+
+	float shadowArea = _dx12->ShadowArea();
+	if (ImGui::SliderFloat("Shadow Area", &shadowArea, 4.0f, 40.0f))
+	{
+		_dx12->SetShadowArea(shadowArea);
 	}
 
 	ImGui::Separator();

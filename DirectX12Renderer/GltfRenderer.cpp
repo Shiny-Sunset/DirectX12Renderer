@@ -58,6 +58,7 @@ bool GltfRenderer::CompileShaders()
 
 	errorBlob.Reset();
 
+	// GltfOutlineVertexShaderの設定
 	result = D3DCompileFromFile(
 		L"GltfOutlineVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"GltfOutlineVS", "vs_5_0",
@@ -68,6 +69,7 @@ bool GltfRenderer::CompileShaders()
 
 	errorBlob.Reset();
 
+	// GltfOutlinePixelShaderの設定
 	result = D3DCompileFromFile(
 		L"GltfOutlinePixelShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"GltfOutlinePS", "ps_5_0",
@@ -75,6 +77,17 @@ bool GltfRenderer::CompileShaders()
 		&_outlinePsBlob, &errorBlob
 	);
 	if (!CheckShaderResult(result, errorBlob.Get(), "GltfOutlinePixelShader")) return false;
+
+	errorBlob.Reset();
+
+	// GltfShadowVertexShaderの設定
+	result = D3DCompileFromFile(
+		L"GltfShadowVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+		"ShadowVS", "vs_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0,
+		&_shadowVsBlob, &errorBlob
+	);
+	if (!CheckShaderResult(result, errorBlob.Get(), "GltfShadowVertexShader")) return false;
 
 	return true;
 }
@@ -278,7 +291,7 @@ bool GltfRenderer::CreateGraphicsPipeline()
 	if (!CheckResult(result, "CreateGraphicsPipelineState")) return false;
 
 	// -- 輪郭線用 PSO --
-	  // シェーダーを差し替え、前面カリングで裏面だけを描く
+	// シェーダーを差し替え、前面カリングで裏面だけを描く
 	gpipeline.VS.pShaderBytecode = _outlineVsBlob->GetBufferPointer();
 	gpipeline.VS.BytecodeLength = _outlineVsBlob->GetBufferSize();
 	gpipeline.PS.pShaderBytecode = _outlinePsBlob->GetBufferPointer();
@@ -288,13 +301,31 @@ bool GltfRenderer::CreateGraphicsPipeline()
 	gpipeline.BlendState.RenderTarget[0] = renderTargetBlendDesc;      // BlendEnable = false のもの
 	gpipeline.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 
-	// 押し出したシェルの「裏面」だけを描く
+	// 押し出したメッシュの「裏面」だけを描く
 	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
 
 	result = _dx12.Device()->CreateGraphicsPipelineState(
 		&gpipeline, IID_PPV_ARGS(&_outlinePipelineState)
 	);
 	if (!CheckResult(result, "CreateGraphicsPipelineState (outline)")) return false;
+
+	// -- 影用 --
+	gpipeline.VS.pShaderBytecode = _shadowVsBlob->GetBufferPointer();
+	gpipeline.VS.BytecodeLength = _shadowVsBlob->GetBufferSize();
+
+	// 色を出さないのでピクセルシェーダーは不要
+	gpipeline.PS.pShaderBytecode = nullptr;
+	gpipeline.PS.BytecodeLength = 0;
+
+	gpipeline.NumRenderTargets = 0;
+	gpipeline.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+	gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
+
+	result = _dx12.Device()->CreateGraphicsPipelineState(
+		&gpipeline, IID_PPV_ARGS(&_shadowPipelineState)
+	);
+	if (!CheckResult(result, "CreateGraphicsPipelineState (shadow)")) return false;
 
 	return true;
 }

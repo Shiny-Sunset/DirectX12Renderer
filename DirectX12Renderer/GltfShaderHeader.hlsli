@@ -15,7 +15,11 @@ cbuffer SceneBuffer : register(b0)
 {
     matrix view;
     matrix proj;
+    matrix lightCamera;
     float3 eye;
+    float _pad0;
+    float3 lightVec;
+    float _pad1;
 };
 
 Texture2D<float4> baseColorTex : register(t0);

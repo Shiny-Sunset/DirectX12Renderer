@@ -47,6 +47,8 @@ public:
     // 描画（GltfRenderer::BeforeDraw() の後に呼ぶ）
     void Draw();
 
+    void DrawShadow();   // 影を落とすためだけの描画
+
     // 名前でアニメーションを選んで再生を開始する
     // @param blendSeconds 前のアニメーションから混ぜながら移行する秒数（0 で即座に切り替え）
     // @return 見つかったら true

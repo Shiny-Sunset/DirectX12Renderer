@@ -28,6 +28,7 @@ public:
 	ID3D12PipelineState* BlendPipelineState() const { return _blendPipelineState.Get(); }
 	ID3D12RootSignature* RootSignature() const { return _rootSignature.Get(); }
 	ID3D12PipelineState* OutlinePipelineState() const { return _outlinePipelineState.Get(); }
+	ID3D12PipelineState* ShadowPipelineState() const { return _shadowPipelineState.Get(); }
 
 private:
 	// ヘッダーのグローバルスコープに using 宣言を置かないためのクラススコープの別名
@@ -48,9 +49,11 @@ private:
 	ComPtr<ID3DBlob> _psBlob;
 	ComPtr<ID3DBlob> _outlineVsBlob;
 	ComPtr<ID3DBlob> _outlinePsBlob;
+	ComPtr<ID3DBlob> _shadowVsBlob;
 
 	ComPtr<ID3D12RootSignature> _rootSignature;
 	ComPtr<ID3D12PipelineState> _pipelineState;
 	ComPtr<ID3D12PipelineState> _blendPipelineState;
 	ComPtr<ID3D12PipelineState> _outlinePipelineState;
+	ComPtr<ID3D12PipelineState> _shadowPipelineState;
 };

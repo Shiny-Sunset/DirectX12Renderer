@@ -18,9 +18,13 @@ SamplerState smpToon : register(s1); // 1 番スロット設定されたサン�
 
 cbuffer cbuff0 : register(b0)   // 定数バッファ(シーン共通)
 {
-    matrix view; // ビュー行列
-    matrix proj; // プロジェクション行列
-    float3 eye; // 視点
+    matrix view;
+    matrix proj;
+    matrix lightCamera;
+    float3 eye;
+    float _pad0;
+    float3 lightVec;
+    float _pad1;
 };
 
 // モデル固有の行列

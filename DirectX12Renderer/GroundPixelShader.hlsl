@@ -1,13 +1,10 @@
-struct GroundOutput
-{
-    float4 svpos : SV_POSITION;
-    float3 worldPos : POSITION;
-};
+#include "GroundShaderHeader.hlsli"
 
 float4 GroundPS(GroundOutput input) : SV_TARGET
 {
-    // 1 メートルごとに線を引く
-    // fwidth で「1 ピクセルあたり何メートル進むか」を取り、線の太さを画面基準で一定にする
+    static const float ShadowBias = 0.005;
+
+    // -- 格子模様（元のコード） --
     float2 uv = input.worldPos.xz;
     float2 width = fwidth(uv);
     float2 grid = abs(frac(uv - 0.5) - 0.5) / max(width, 1e-5);
@@ -15,5 +12,17 @@ float4 GroundPS(GroundOutput input) : SV_TARGET
 
     float3 lineColor = float3(0.30, 0.30, 0.35);
     float3 baseColor = float3(0.55, 0.55, 0.60);
-    return float4(lerp(lineColor, baseColor, lineMask), 1.0);
+    float3 color = lerp(lineColor, baseColor, lineMask);
+
+    // -- 影の判定 --
+    float3 posFromLight = input.tpos.xyz / input.tpos.w;
+    float2 shadowUV = (posFromLight.xy + float2(1, -1)) * float2(0.5, -0.5);
+
+    // 比較とフィルタリングを GPU がまとめて行う
+    // 戻り値は「光が当たっている割合」で、0〜1 の中間値になる
+    float lit = shadowMap.SampleCmpLevelZero(shadowSmp, shadowUV, posFromLight.z - ShadowBias);
+
+    float shadowWeight = lerp(0.5, 1.0, lit);
+
+    return float4(color * shadowWeight, 1.0);
 }
