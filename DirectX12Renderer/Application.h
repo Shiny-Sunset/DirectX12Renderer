@@ -10,6 +10,7 @@ class PMDRenderer;
 class PMDActor;
 class GltfRenderer;
 class GltfActor;
+class GltfModel;
 class DebugUI;
 class Ground;
 class Pera;
@@ -66,9 +67,11 @@ private:
 	std::unique_ptr<PMDRenderer> _pmdRenderer;
 	std::unique_ptr<PMDActor> _pmdActor;
 	std::unique_ptr<GltfRenderer> _gltfRenderer;
-	std::unique_ptr<GltfActor> _gltfActor;
+	std::unique_ptr<GltfModel> _gltfModel;
+	std::vector<std::unique_ptr<GltfActor>> _gltfActors;
 	std::unique_ptr<Ground> _ground;
 	std::unique_ptr<Pera> _pera;
+	GltfActor* _player = nullptr;                        // 操作対象への参照（所有しない）
 	GameTimer _timer;
 	Input _input;
 	Camera _camera;

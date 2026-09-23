@@ -78,6 +78,9 @@
     <ClCompile Include="Pera.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="GltfModel.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="BasicVertexShader.hlsl">
@@ -86,8 +89,6 @@
     <FxCompile Include="BasicPixelShader.hlsl">
       <Filter>ソース ファイル</Filter>
     </FxCompile>
-    <FxCompile Include="PeraVertexShader.hlsl" />
-    <FxCompile Include="PeraPixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="BasicShaderHeader.hlsli">
@@ -103,6 +104,10 @@
     <None Include="GroundVertexShader.hlsl" />
     <None Include="GroundPixelShader.hlsl" />
     <None Include="PeraShaderHeader.hlsli" />
+    <None Include="GroundShaderHeader.hlsli" />
+    <None Include="GltfShadowVertexShader.hlsl" />
+    <None Include="PeraVertexShader.hlsl" />
+    <None Include="PeraPixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h">
@@ -166,6 +171,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Pera.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="GltfModel.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

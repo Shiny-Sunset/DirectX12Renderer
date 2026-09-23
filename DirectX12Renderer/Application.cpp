@@ -2,6 +2,7 @@
 #include "Dx12Wrapper.h"
 #include "PMDActor.h"
 #include "PMDRenderer.h"
+#include "GltfModel.h"
 #include "GltfActor.h"
 #include "GltfRenderer.h"
 #include "DebugUI.h"
@@ -141,9 +142,22 @@ bool Application::Init()
 	if (!_pmdRenderer->Init()) return false;
 	*/
 
-	// -- モデルの読み込み --
-	_gltfActor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer);
-	if (!_gltfActor->Init(model_path)) return false;
+	// -- モデルの読み込み（1 回だけ） --
+	_gltfModel = std::make_unique<GltfModel>(*_dx12);
+	if (!_gltfModel->Init(model_path)) return false;
+
+	// -- アクターを 3 体作る --
+	const char* anims[] = { "Walk", "Idle", "Run" };
+	for (int i = 0; i < 3; ++i)
+	{
+		auto actor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer, *_gltfModel);
+		if (!actor->Init()) return false;
+		actor->SetPosition({ i * 2.0f - 2.0f, 0.0f, 0.0f });
+		actor->PlayAnimation(anims[i]);
+		_gltfActors.push_back(std::move(actor));
+	}
+	_player = _gltfActors[0].get();
+
 	/*
 	_pmdActor = std::make_unique<PMDActor>(*_dx12);
 	if (!_pmdActor->Init(model_path)) return false;
@@ -158,9 +172,9 @@ bool Application::Init()
 
 	_dx12->SetCamera(eye, target, 0.1f, 100.0f);
 
-	_gltfActor->PlayAnimation("Walk");
+	_player->PlayAnimation("Walk");
 
-	_gltfActor->SetOutlineEnabled(false);
+	_player->SetOutlineEnabled(false);
 
 	return true;
 }
@@ -196,22 +210,22 @@ void Application::Run()
 		const bool uiHasKeyboard = _debugUI->WantCaptureKeyboard();
 		if (!uiHasKeyboard)
 		{
-			if (_input.IsTriggered('O')) _gltfActor->SetOutlineEnabled(!_gltfActor->IsOutlineEnabled());
-			if (_input.IsTriggered('1')) _gltfActor->PlayAnimation("Idle");
-			if (_input.IsTriggered('2')) _gltfActor->PlayAnimation("Walk");
-			if (_input.IsTriggered('3')) _gltfActor->PlayAnimation("Run");
+			if (_input.IsTriggered('O')) _player->SetOutlineEnabled(!_player->IsOutlineEnabled());
+			if (_input.IsTriggered('1')) _player->PlayAnimation("Idle");
+			if (_input.IsTriggered('2')) _player->PlayAnimation("Walk");
+			if (_input.IsTriggered('3')) _player->PlayAnimation("Run");
 		}
 
 		// -- 更新処理 --
 		UpdatePlayer(dt);
-		_gltfActor->Update(dt);
+		for (auto& actor : _gltfActors) actor->Update(dt);
 		//_pmdActor->Update();
 
-		_dx12->UpdateLightCamera(_gltfActor->Position());
+		_dx12->UpdateLightCamera(_player->Position());
 
 		if (!_debugUI->WantCaptureMouse())
 		{
-			_camera.Update(_input, dt, _gltfActor->Position());
+			_camera.Update(_input, dt, _player->Position());
 		}
 		_dx12->SetCamera(_camera.Eye(), _camera.Focus(), 0.1f, 100.0f);
 
@@ -223,7 +237,7 @@ void Application::Run()
 		// -- 描画処理 --
 		// -- 0 パス目：影 --
 		_dx12->BeginShadowPass();
-		_gltfActor->DrawShadow();
+		for (auto& actor : _gltfActors) actor->DrawShadow();
 		_dx12->EndShadowPass();
 		
 		// -- 1 パス目：シーンをテクスチャへ --
@@ -232,7 +246,7 @@ void Application::Run()
 		//_pmdActor->Draw
 		_ground->Draw();
 		_gltfRenderer->BeforeDraw();
-		_gltfActor->Draw();
+		for (auto& actor : _gltfActors) actor->Draw();
 		_dx12->EndOffscreenPass();
 
 
@@ -252,9 +266,12 @@ void Application::Terminate()
 	_debugUI.reset();
 	_pmdActor.reset();
 	_pmdRenderer.reset();
-	_gltfActor.reset();
+	_player = nullptr;         // 所有しないポインタを先に無効化
+	_gltfActors.clear();       // 中の unique_ptr をすべて解放
+	_gltfModel.reset();        // アクターが参照し終わってから解放
 	_gltfRenderer.reset();
 	_ground.reset();
+	_pera.reset();
 	_dx12.reset();
 
 	// 使用しないクラスの登録解除
@@ -324,32 +341,32 @@ void Application::BuildDebugUI()
 
 	ImGui::Text("Transform");
 
-	DirectX::XMFLOAT3 pos = _gltfActor->Position();
+	DirectX::XMFLOAT3 pos = _player->Position();
 	if (ImGui::DragFloat3("Position", &pos.x, 0.01f))
 	{
-		_gltfActor->SetPosition(pos);
+		_player->SetPosition(pos);
 	}
 
-	float yawDeg = DirectX::XMConvertToDegrees(_gltfActor->RotationY());
+	float yawDeg = DirectX::XMConvertToDegrees(_player->RotationY());
 	if (ImGui::SliderFloat("Rotation Y", &yawDeg, -180.0f, 180.0f))
 	{
-		_gltfActor->SetRotationY(DirectX::XMConvertToRadians(yawDeg));
+		_player->SetRotationY(DirectX::XMConvertToRadians(yawDeg));
 	}
 
 	ImGui::Separator();
 
 	// -- 表示 --
-	bool outline = _gltfActor->IsOutlineEnabled();
+	bool outline = _player->IsOutlineEnabled();
 	if (ImGui::Checkbox("Outline", &outline))
 	{
-		_gltfActor->SetOutlineEnabled(outline);
+		_player->SetOutlineEnabled(outline);
 	}
 
 	ImGui::Separator();
 
 	// -- アニメーション --
-	ImGui::Text("Anim: %s", _gltfActor->CurrentAnimationName());
-	ImGui::Text("Blend: %.2f", _gltfActor->BlendWeight());
+	ImGui::Text("Anim: %s", _player->CurrentAnimationName());
+	ImGui::Text("Blend: %.2f", _player->BlendWeight());
 	ImGui::Separator();
 
 	ImGui::Text("Animation");
@@ -357,7 +374,7 @@ void Application::BuildDebugUI()
 	{
 		if (ImGui::Button(name))
 		{
-			_gltfActor->PlayAnimation(name);
+			_player->PlayAnimation(name);
 		}
 		ImGui::SameLine();
 	}
@@ -385,7 +402,7 @@ void Application::UpdatePlayer(float deltaTime)
 	// 入力が無ければ Idle にして終わり
 	if (inputX == 0.0f && inputZ == 0.0f)
 	{
-		_gltfActor->PlayAnimation("Idle");
+		_player->PlayAnimation("Idle");
 		return;
 	}
 
@@ -403,21 +420,21 @@ void Application::UpdatePlayer(float deltaTime)
 	const bool isRunning = _input.IsPressed(VK_SHIFT);
 	const float speed = isRunning ? RunSpeed : WalkSpeed;
 
-	DirectX::XMFLOAT3 pos = _gltfActor->Position();
+	DirectX::XMFLOAT3 pos = _player->Position();
 	DirectX::XMStoreFloat3(&pos,
 		DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&pos),
 			DirectX::XMVectorScale(dir, speed * deltaTime)));
-	_gltfActor->SetPosition(pos);
+	_player->SetPosition(pos);
 
 	// -- 4. 進行方向へ体を向ける（急に向きが変わらないよう補間する） --
 	DirectX::XMFLOAT3 d;
 	DirectX::XMStoreFloat3(&d, dir);
 	const float targetYaw = atan2f(d.x, d.z);
 
-	float diff = DirectX::XMScalarModAngle(targetYaw - _gltfActor->RotationY());
+	float diff = DirectX::XMScalarModAngle(targetYaw - _player->RotationY());
 	const float t = std::min(1.0f, TurnSpeed * deltaTime);
-	_gltfActor->SetRotationY(_gltfActor->RotationY() + diff * t);
+	_player->SetRotationY(_player->RotationY() + diff * t);
 
 	// -- 5. アニメーション --
-	_gltfActor->PlayAnimation(isRunning ? "Run" : "Walk");
+	_player->PlayAnimation(isRunning ? "Run" : "Walk");
 }

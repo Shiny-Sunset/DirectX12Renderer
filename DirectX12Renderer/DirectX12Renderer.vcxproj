@@ -152,6 +152,7 @@
     <ClCompile Include="Dx12Wrapper.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="GameTimer.cpp" />
+    <ClCompile Include="GltfModel.cpp" />
     <ClCompile Include="Ground.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="GltfActor.cpp" />
@@ -198,6 +199,7 @@
     <ClInclude Include="External\imgui\imstb_truetype.h" />
     <ClInclude Include="External\imgui\backends\imgui_impl_dx12.h" />
     <ClInclude Include="External\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="GltfModel.h" />
     <ClInclude Include="Pera.h" />
   </ItemGroup>
   <ItemGroup>
