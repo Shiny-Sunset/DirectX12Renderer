@@ -162,6 +162,7 @@
     <ClCompile Include="GltfRenderer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Pera.cpp" />
+    <ClCompile Include="Player.cpp" />
     <ClCompile Include="PMDActor.cpp" />
     <ClCompile Include="PMDRenderer.cpp" />
     <ClCompile Include="Util.cpp" />
@@ -217,6 +218,7 @@
     <ClInclude Include="Input.h" />
     <ClInclude Include="GltfActor.h" />
     <ClInclude Include="GltfRenderer.h" />
+    <ClInclude Include="Player.h" />
     <ClInclude Include="PMDActor.h" />
     <ClInclude Include="PMDRenderer.h" />
     <ClInclude Include="Util.h" />

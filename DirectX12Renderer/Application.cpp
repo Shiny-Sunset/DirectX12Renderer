@@ -12,6 +12,7 @@
 #include "Pera.h"
 #include "CharacterController.h"
 #include "Enemy.h"
+#include "Player.h"
 #include <tchar.h>
 #include <iostream>
 #include <algorithm>
@@ -167,6 +168,8 @@ bool Application::Init()
 
 	_playerController = _controllers[0].get();
 
+	_playerLogic = std::make_unique<Player>(*_player, *_playerController);
+
 	/*
 	_pmdActor = std::make_unique<PMDActor>(*_dx12);
 	if (!_pmdActor->Init(model_path)) return false;
@@ -228,10 +231,18 @@ void Application::Run()
 		}
 
 		// -- 更新処理 --
-		UpdatePlayer(dt);
+		_playerLogic->Update(dt, _input, _camera.Yaw(), !_debugUI->WantCaptureKeyboard());
 		for (auto& e : _enemies) e->Update(dt, _player->Position());	// 敵の判断
-		for (auto& c : _controllers) c->Update(dt);	// 当たり判定
+		CheckAttackHits();	// ヒット判定
+		for (auto& c : _controllers) c->Update(dt);	// コリジョン更新
 		ResolveCollisions();	// 重なりの解消
+		// 敵の攻撃がプレイヤーに当たっているか
+		for (auto& e : _enemies)
+		{
+			if (!e->IsAttackActive()) continue;
+			if (!Intersects(e->AttackSphere(), _playerLogic->BodySphere())) continue;
+			_playerLogic->TakeDamage(1);
+		}
 		for (auto& actor : _gltfActors) actor->Update(dt);	// 実際に動かす
 		//_pmdActor->Update();
 
@@ -374,8 +385,16 @@ void Application::BuildDebugUI()
 	ImGui::Text("Grounded: %s", _playerController->IsGrounded() ? "yes" : "no");
 	ImGui::Text("VelocityY: %.2f", _playerController->VelocityY());
 
-	ImGui::SliderFloat("Walk Speed", &_walkSpeed, 0.5f, 6.0f);
-	ImGui::SliderFloat("Run Speed", &_runSpeed, 1.0f, 12.0f);
+	float walkSpeed = _playerLogic->WalkSpeed();
+	if (ImGui::SliderFloat("Walk Speed", &walkSpeed, 0.5f, 6.0f))
+	{
+		_playerLogic->SetWalkSpeed(walkSpeed);
+	}
+	float runSpeed = _playerLogic->RunSpeed();
+	if (ImGui::SliderFloat("Walk Speed", &runSpeed, 0.5f, 6.0f))
+	{
+		_playerLogic->SetWalkSpeed(runSpeed);
+	}
 
 	float jumpHeight = _playerController->JumpHeight();
 	if (ImGui::SliderFloat("Jump Height", &jumpHeight, 0.3f, 3.0f))
@@ -441,71 +460,18 @@ void Application::BuildDebugUI()
 	{
 		ImGui::Text("#%zu: %s", i, _enemies[i]->StateName());
 	}
+
+	ImGui::Text("Player: %s  HP %d", _playerLogic->StateName(), _playerLogic->HP());
+	for (size_t i = 0; i < _enemies.size(); ++i)
+	{
+		ImGui::Text("#%zu: %-8s HP %d", i, _enemies[i]->StateName(), _enemies[i]->HP());
+	}
 	ImGui::NewLine();
 
 	ImGui::End();
 
 	// ImGui で何ができるかの見本（慣れたら消す）
 	ImGui::ShowDemoWindow();
-}
-
-void Application::UpdatePlayer(float deltaTime)
-{
-	// -- 1. 入力を「前後」「左右」の量に変換する --
-	float inputX = 0.0f;   // 右が +
-	float inputZ = 0.0f;   // 前が +
-	if (!_debugUI->WantCaptureKeyboard())
-	{
-		if (_input.IsPressed('W')) inputZ += 1.0f;
-		if (_input.IsPressed('S')) inputZ -= 1.0f;
-		if (_input.IsPressed('D')) inputX += 1.0f;
-		if (_input.IsPressed('A')) inputX -= 1.0f;
-	}
-
-	const bool onGround = _playerController->IsGrounded();
-
-	// -- 2. ジャンプ --
-	if (!_debugUI->WantCaptureKeyboard() && _input.IsTriggered(VK_SPACE))
-	{
-		_playerController->Jump();
-	}
-
-	// -- 3. 移動 --
-	if (inputX == 0.0f && inputZ == 0.0f)
-	{
-		_playerController->SetMoveVelocity(0.0f, 0.0f);   //速度を止めるのを忘れずに
-		if (onGround) _player->PlayAnimation("Idle");
-	}
-	else
-	{
-		// -- カメラの向きを基準に、ワールドでの進行方向を作る --
-		const float camYaw = _camera.Yaw();
-		const DirectX::XMFLOAT3 forward = { sinf(camYaw), 0.0f, cosf(camYaw) };
-		const DirectX::XMFLOAT3 right = { forward.z, 0.0f, -forward.x };
-
-		DirectX::XMVECTOR dir = DirectX::XMVectorAdd(
-			DirectX::XMVectorScale(DirectX::XMLoadFloat3(&forward), inputZ),
-			DirectX::XMVectorScale(DirectX::XMLoadFloat3(&right), inputX));
-		dir = DirectX::XMVector3Normalize(dir);
-
-		const bool isRunning = _input.IsPressed(VK_SHIFT);
-		const float speed = isRunning ? _runSpeed : _walkSpeed;
-
-		DirectX::XMFLOAT3 d;
-		DirectX::XMStoreFloat3(&d, dir);
-		_playerController->SetMoveVelocity(d.x * speed, d.z * speed);
-
-		// 向きの補間（位置は動かさない）
-		const float targetYaw = atan2f(d.x, d.z);
-		float diff = DirectX::XMScalarModAngle(targetYaw - _player->RotationY());
-		const float t = std::min(1.0f, TurnSpeed * deltaTime);
-		_player->SetRotationY(_player->RotationY() + diff * t);
-
-		if (onGround) _player->PlayAnimation(isRunning ? "Run" : "Walk");
-	}
-
-	// -- 4. 空中のアニメーション --
-	if (!onGround) _player->PlayAnimation("Curl_up_loop", 0.1f);
 }
 
 void Application::ResolveCollisions()
@@ -537,5 +503,21 @@ void Application::ResolveCollisions()
 				b.PushXZ(-pushX * ratioB, -pushZ * ratioB);
 			}
 		}
+	}
+}
+
+void Application::CheckAttackHits()
+{
+	if (!_playerLogic->IsAttackActive()) return;
+
+	const Sphere atk = _playerLogic->AttackSphere();
+	const auto& pp = _player->Position();
+
+	for (auto& e : _enemies)
+	{
+		if (e->IsDead()) continue;
+		if (!Intersects(atk, e->BodySphere())) continue;
+
+		e->TakeDamage(1, _playerLogic->AttackId(), pp.x, pp.z);
 	}
 }

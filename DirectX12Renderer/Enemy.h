@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <DirectXMath.h>
+#include "Collision.h"
 
 class GltfActor;
 class CharacterController;
@@ -15,6 +16,9 @@ public:
     {
         Idle,    // その場で待機
         Chase,   // プレイヤーを追いかける
+        Attack,
+        Damaged, 
+        Dead,
     };
 
     Enemy(GltfActor& actor, CharacterController& controller);
@@ -24,6 +28,20 @@ public:
 
     State CurrentState() const { return _state; }
     const char* StateName() const;   // デバッグ表示用
+
+    // ダメージを受ける
+    // @param attackId 攻撃の通し番号（同じ番号なら二重ヒットとして無視する）
+    // @param fromX, fromZ 攻撃してきた相手の位置（ノックバックの向き）
+    void TakeDamage(int amount, unsigned int attackId, float fromX, float fromZ);
+
+    bool IsDead() const { return _state == State::Dead; }
+    Sphere BodySphere() const;   // Application から判定に使う
+
+    // 攻撃判定の球（アクティブな時間だけ有効）
+    Sphere AttackSphere() const;
+    bool IsAttackActive() const;
+
+    int HP() const { return _hp; }
 
 private:
     // 状態を切り替える（アニメーションの変更もここでまとめて行う）
@@ -46,4 +64,17 @@ private:
     static constexpr float StopDistance = 1.0f;   // これ以上は近づかない
     static constexpr float ChaseSpeed = 2.0f;     // 追跡する速さ（m/秒）
     static constexpr float TurnSpeed = 8.0f;      // 向きを変える速さ
+    int _hp = 2;
+    unsigned int _lastHitAttackId = 0;
+
+    static constexpr float DamagedTime = 0.4f;     // のけぞる時間
+    static constexpr float KnockbackSpeed = 4.0f;  // 弾かれる速さ
+
+    static constexpr float AttackRange = 1.2f;      // この距離で攻撃を始める
+    static constexpr float AttackDuration = 0.8f;
+    static constexpr float AttackHitTime = 0.3f;    // この時刻に判定が出る
+    static constexpr float AttackCooldown = 1.5f;   // 次に攻撃できるまで
+
+    float _cooldown = 0.0f;
+    bool _hitDone = false;   // この攻撃で既に当てたか
 };

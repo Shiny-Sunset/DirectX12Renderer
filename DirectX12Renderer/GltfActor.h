@@ -56,6 +56,9 @@ public:
     void SetOutlineEnabled(bool enabled) { _outlineEnabled = enabled; }
     bool IsOutlineEnabled() const { return _outlineEnabled; }
 
+    void SetVisible(bool v) { _visible = v; }
+    bool IsVisible() const { return _visible; }
+
 private:
     template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -114,4 +117,6 @@ private:
         float weight, std::vector<GltfModel::Node>& out) const;
 
     void ApplyAnimation(float timeSec);         // _animNodes を書き換える
+
+    bool _visible = true;
 };

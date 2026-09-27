@@ -86,6 +86,7 @@ void GltfActor::UpdateWorldMatrix()
 
 void GltfActor::Draw()
 {
+	if (!_visible) return;
 	auto cmdList = _dx12.CommandList();
 
 	// ディスクリプタヒープの指定
@@ -161,6 +162,7 @@ void GltfActor::Draw()
 
 void GltfActor::DrawShadow()
 {
+	if (!_visible) return;
 	auto cmdList = _dx12.CommandList();
 
 	cmdList->SetPipelineState(_renderer.ShadowPipelineState());

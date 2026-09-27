@@ -16,6 +16,7 @@ class Ground;
 class Pera;
 class CharacterController;
 class Enemy;
+class Player;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -59,11 +60,11 @@ private:
 	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
 	void BuildDebugUI();
 
-	// プレイヤーの移動と向きを更新する
-	void UpdatePlayer(float deltaTime);
-
 	// 重なりを解消
 	void ResolveCollisions();
+
+	// ヒット判定
+	void CheckAttackHits();
 
 	// 宣言順がそのまま構築順、破棄はその逆順になる
 	// PMDActor / PMDRenderer は Dx12Wrapper を参照するので、Dx12Wrapper を先に宣言する
@@ -79,12 +80,9 @@ private:
 	std::vector<std::unique_ptr<CharacterController>> _controllers;
 	CharacterController* _playerController = nullptr;
 	GltfActor* _player = nullptr;                        // 操作対象への参照（所有しない）
+	std::unique_ptr<Player> _playerLogic;
 	std::vector<std::unique_ptr<Enemy>> _enemies;
 	GameTimer _timer;
 	Input _input;
 	Camera _camera;
-
-	// -- プレイヤーの調整値 --
-	float _walkSpeed = 1.8f;   // m/秒
-	float _runSpeed = 4.0f;
 };
