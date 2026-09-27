@@ -18,7 +18,7 @@ class GltfRenderer;
 class GltfActor
 {
 public:
-    explicit GltfActor(Dx12Wrapper& dx12, GltfRenderer& _renderer, GltfModel& model);
+    explicit GltfActor(Dx12Wrapper& dx12, GltfRenderer& renderer, GltfModel& model);
     ~GltfActor();
 
     GltfActor(const GltfActor&) = delete;

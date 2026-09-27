@@ -10,6 +10,7 @@
 #include "imgui.h"
 #include "Ground.h"
 #include "Pera.h"
+#include "CharacterController.h"
 #include <tchar.h>
 #include <iostream>
 #include <algorithm>
@@ -43,9 +44,6 @@ namespace
 		}
 		return DefWindowProc(hwnd, msg, wparam, lparam);
 	}
-
-	constexpr float WalkSpeed = 1.8f;    // m/秒
-	constexpr float RunSpeed = 4.0f;
 	constexpr float TurnSpeed = 12.0f;   // 向きを合わせる速さ
 }
 
@@ -155,8 +153,13 @@ bool Application::Init()
 		actor->SetPosition({ i * 2.0f - 2.0f, 0.0f, 0.0f });
 		actor->PlayAnimation(anims[i]);
 		_gltfActors.push_back(std::move(actor));
+
+		auto controller = std::make_unique<CharacterController>(*_gltfActors.back());
+		_controllers.push_back(std::move(controller));
 	}
 	_player = _gltfActors[0].get();
+
+	_playerController = _controllers[0].get();
 
 	/*
 	_pmdActor = std::make_unique<PMDActor>(*_dx12);
@@ -218,6 +221,11 @@ void Application::Run()
 
 		// -- 更新処理 --
 		UpdatePlayer(dt);
+		for (auto& c : _controllers)
+		{
+			c->Update(dt);
+		}
+		ResolveCollisions();
 		for (auto& actor : _gltfActors) actor->Update(dt);
 		//_pmdActor->Update();
 
@@ -266,6 +274,8 @@ void Application::Terminate()
 	_debugUI.reset();
 	_pmdActor.reset();
 	_pmdRenderer.reset();
+	_playerController = nullptr;
+	_controllers.clear();
 	_player = nullptr;         // 所有しないポインタを先に無効化
 	_gltfActors.clear();       // 中の unique_ptr をすべて解放
 	_gltfModel.reset();        // アクターが参照し終わってから解放
@@ -354,6 +364,26 @@ void Application::BuildDebugUI()
 	}
 
 	ImGui::Separator();
+	ImGui::Text("Character");
+	ImGui::Text("Grounded: %s", _playerController->IsGrounded() ? "yes" : "no");
+	ImGui::Text("VelocityY: %.2f", _playerController->VelocityY());
+
+	ImGui::SliderFloat("Walk Speed", &_walkSpeed, 0.5f, 6.0f);
+	ImGui::SliderFloat("Run Speed", &_runSpeed, 1.0f, 12.0f);
+
+	float jumpHeight = _playerController->JumpHeight();
+	if (ImGui::SliderFloat("Jump Height", &jumpHeight, 0.3f, 3.0f))
+	{
+		_playerController->SetJumpHeight(jumpHeight);
+	}
+
+	float gravity = _playerController->Gravity();
+	if (ImGui::SliderFloat("Gravity", &gravity, -50.0f, -5.0f))
+	{
+		_playerController->SetGravity(gravity);
+	}
+
+	ImGui::Separator();
 
 	// -- 表示 --
 	bool outline = _player->IsOutlineEnabled();
@@ -378,6 +408,26 @@ void Application::BuildDebugUI()
 		}
 		ImGui::SameLine();
 	}
+
+	ImGui::Separator();
+	ImGui::Text("Collision");
+
+	float radius = _playerController->Radius();
+	if (ImGui::SliderFloat("Radius", &radius, 0.1f, 1.5f))
+	{
+		for (auto& c : _controllers) c->SetRadius(radius);
+	}
+
+	// プレイヤーと 2 体目の距離
+	if (_controllers.size() > 1)
+	{
+		const auto pa = _controllers[0]->BodySphere().center;
+		const auto pb = _controllers[1]->BodySphere().center;
+		const float dx = pa.x - pb.x, dz = pa.z - pb.z;
+		ImGui::Text("Dist to #1: %.2f (sum r = %.2f)",
+			sqrtf(dx * dx + dz * dz),
+			_controllers[0]->Radius() + _controllers[1]->Radius());
+	}
 	ImGui::NewLine();
 
 	ImGui::End();
@@ -399,42 +449,76 @@ void Application::UpdatePlayer(float deltaTime)
 		if (_input.IsPressed('A')) inputX -= 1.0f;
 	}
 
-	// 入力が無ければ Idle にして終わり
-	if (inputX == 0.0f && inputZ == 0.0f)
+	const bool onGround = _playerController->IsGrounded();
+
+	// -- 2. ジャンプ --
+	if (!_debugUI->WantCaptureKeyboard() && _input.IsTriggered(VK_SPACE))
 	{
-		_player->PlayAnimation("Idle");
-		return;
+		_playerController->Jump();
 	}
 
-	// -- 2. カメラの向きを基準に、ワールドでの進行方向を作る --
-	const float camYaw = _camera.Yaw();   // カメラ未実装のうちは 0.0f を直接書く
-	const DirectX::XMFLOAT3 forward = { sinf(camYaw), 0.0f, cosf(camYaw) };
-	const DirectX::XMFLOAT3 right = { forward.z, 0.0f, -forward.x };
+	// -- 3. 移動 --
+	if (inputX == 0.0f && inputZ == 0.0f)
+	{
+		_playerController->SetMoveVelocity(0.0f, 0.0f);   //速度を止めるのを忘れずに
+		if (onGround) _player->PlayAnimation("Idle");
+	}
+	else
+	{
+		// -- カメラの向きを基準に、ワールドでの進行方向を作る --
+		const float camYaw = _camera.Yaw();
+		const DirectX::XMFLOAT3 forward = { sinf(camYaw), 0.0f, cosf(camYaw) };
+		const DirectX::XMFLOAT3 right = { forward.z, 0.0f, -forward.x };
 
-	DirectX::XMVECTOR dir = DirectX::XMVectorAdd(
-		DirectX::XMVectorScale(DirectX::XMLoadFloat3(&forward), inputZ),
-		DirectX::XMVectorScale(DirectX::XMLoadFloat3(&right), inputX));
-	dir = DirectX::XMVector3Normalize(dir);
+		DirectX::XMVECTOR dir = DirectX::XMVectorAdd(
+			DirectX::XMVectorScale(DirectX::XMLoadFloat3(&forward), inputZ),
+			DirectX::XMVectorScale(DirectX::XMLoadFloat3(&right), inputX));
+		dir = DirectX::XMVector3Normalize(dir);
 
-	// -- 3. 位置を進める --
-	const bool isRunning = _input.IsPressed(VK_SHIFT);
-	const float speed = isRunning ? RunSpeed : WalkSpeed;
+		const bool isRunning = _input.IsPressed(VK_SHIFT);
+		const float speed = isRunning ? _runSpeed : _walkSpeed;
 
-	DirectX::XMFLOAT3 pos = _player->Position();
-	DirectX::XMStoreFloat3(&pos,
-		DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&pos),
-			DirectX::XMVectorScale(dir, speed * deltaTime)));
-	_player->SetPosition(pos);
+		DirectX::XMFLOAT3 d;
+		DirectX::XMStoreFloat3(&d, dir);
+		_playerController->SetMoveVelocity(d.x * speed, d.z * speed);
 
-	// -- 4. 進行方向へ体を向ける（急に向きが変わらないよう補間する） --
-	DirectX::XMFLOAT3 d;
-	DirectX::XMStoreFloat3(&d, dir);
-	const float targetYaw = atan2f(d.x, d.z);
+		// 向きの補間（位置は動かさない）
+		const float targetYaw = atan2f(d.x, d.z);
+		float diff = DirectX::XMScalarModAngle(targetYaw - _player->RotationY());
+		const float t = std::min(1.0f, TurnSpeed * deltaTime);
+		_player->SetRotationY(_player->RotationY() + diff * t);
 
-	float diff = DirectX::XMScalarModAngle(targetYaw - _player->RotationY());
-	const float t = std::min(1.0f, TurnSpeed * deltaTime);
-	_player->SetRotationY(_player->RotationY() + diff * t);
+		if (onGround) _player->PlayAnimation(isRunning ? "Run" : "Walk");
+	}
 
-	// -- 5. アニメーション --
-	_player->PlayAnimation(isRunning ? "Run" : "Walk");
+	// -- 4. 空中のアニメーション --
+	if (!onGround) _player->PlayAnimation("Curl_up_loop", 0.1f);
+}
+
+void Application::ResolveCollisions()
+{
+	// 総当たりで調べる
+	for (size_t i = 0; i < _controllers.size(); ++i)
+	{
+		for (size_t j = i + 1; j < _controllers.size(); ++j)
+		{
+			auto& a = *_controllers[i];
+			auto& b = *_controllers[j];
+
+			float pushX = 0.0f, pushZ = 0.0f;
+			if (!ResolveXZ(a.BodySphere(), b.BodySphere(), pushX, pushZ)) continue;
+
+			// 両方動けるなら半分ずつ、片方だけなら動ける側が全部負担する
+			if (a.IsMovable() && b.IsMovable())
+			{
+				a.PushXZ(pushX * 0.5f, pushZ * 0.5f);
+				b.PushXZ(-pushX * 0.5f, -pushZ * 0.5f);
+			}
+			else
+			{
+				a.PushXZ(pushX, pushZ);
+				b.PushXZ(-pushX, -pushZ);   // 動けない側は PushXZ の中で無視される
+			}
+		}
+	}
 }

@@ -14,6 +14,7 @@ class GltfModel;
 class DebugUI;
 class Ground;
 class Pera;
+class CharacterController;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -60,6 +61,9 @@ private:
 	// プレイヤーの移動と向きを更新する
 	void UpdatePlayer(float deltaTime);
 
+	// 重なりを解消
+	void ResolveCollisions();
+
 	// 宣言順がそのまま構築順、破棄はその逆順になる
 	// PMDActor / PMDRenderer は Dx12Wrapper を参照するので、Dx12Wrapper を先に宣言する
 	std::unique_ptr<Dx12Wrapper> _dx12;
@@ -71,8 +75,14 @@ private:
 	std::vector<std::unique_ptr<GltfActor>> _gltfActors;
 	std::unique_ptr<Ground> _ground;
 	std::unique_ptr<Pera> _pera;
+	std::vector<std::unique_ptr<CharacterController>> _controllers;
+	CharacterController* _playerController = nullptr;
 	GltfActor* _player = nullptr;                        // 操作対象への参照（所有しない）
 	GameTimer _timer;
 	Input _input;
 	Camera _camera;
+
+	// -- プレイヤーの調整値 --
+	float _walkSpeed = 1.8f;   // m/秒
+	float _runSpeed = 4.0f;
 };
