@@ -532,6 +532,25 @@ bool Dx12Wrapper::CreateShadowMap()
 	return true;
 }
 
+bool Dx12Wrapper::CreateDefaultTextures()
+{
+	_whiteTex = CreateWhiteTexture();
+	_blackTex = CreateBlackTexture();
+	_gradTex = CreateGrayGradationTexture();
+
+	return _whiteTex != nullptr && _blackTex != nullptr && _gradTex != nullptr;
+}
+
+void Dx12Wrapper::CreateSceneConstantBufferView(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+{
+	D3D12_CONSTANT_BUFFER_VIEW_DESC matrixCBVDesc = {};
+
+	matrixCBVDesc.BufferLocation = _sceneConstBuff->GetGPUVirtualAddress();
+	matrixCBVDesc.SizeInBytes = static_cast<UINT>(_sceneConstBuff->GetDesc().Width);	// 256 バイト境界に揃ったサイズ
+
+	_dev->CreateConstantBufferView(&matrixCBVDesc, handle);
+}
+
 void Dx12Wrapper::SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& target, float nearZ, float farZ)
 {
 	DirectX::XMFLOAT3 up(0, 1, 0);	// 上ベクトル
@@ -570,25 +589,6 @@ void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 
 	_mappedScene->lightCamera = lightView * lightProj;
 	_mappedScene->lightVec = _lightVec;
-}
-
-bool Dx12Wrapper::CreateDefaultTextures()
-{
-	_whiteTex = CreateWhiteTexture();
-	_blackTex = CreateBlackTexture();
-	_gradTex = CreateGrayGradationTexture();
-
-	return _whiteTex != nullptr && _blackTex != nullptr && _gradTex != nullptr;
-}
-
-void Dx12Wrapper::CreateSceneConstantBufferView(D3D12_CPU_DESCRIPTOR_HANDLE handle)
-{
-	D3D12_CONSTANT_BUFFER_VIEW_DESC matrixCBVDesc = {};
-
-	matrixCBVDesc.BufferLocation = _sceneConstBuff->GetGPUVirtualAddress();
-	matrixCBVDesc.SizeInBytes = static_cast<UINT>(_sceneConstBuff->GetDesc().Width);	// 256 バイト境界に揃ったサイズ
-
-	_dev->CreateConstantBufferView(&matrixCBVDesc, handle);
 }
 
 void Dx12Wrapper::BeginShadowPass()

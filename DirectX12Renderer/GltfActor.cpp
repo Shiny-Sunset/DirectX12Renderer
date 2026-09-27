@@ -239,12 +239,8 @@ bool GltfActor::CreateMaterialAndTextureView()
 	device->CreateConstantBufferView(&transformCBVDesc, handle);
 	handle.ptr += incSize;
 
-	// テクスチャが指定されなかったときに使う既定のテクスチャ
-	auto whiteTex = _dx12.WhiteTexture();
-	auto blackTex = _dx12.BlackTexture();
-	auto gradTex = _dx12.GradTexture();
-
 	// 3 番目以降にマテリアルの定数バッファビュー(b2)をマテリアル数ぶん並べる
+	// テクスチャが指定されていないマテリアルには、既定の白テクスチャを割り当てる
 	for (UINT i = 0; i < materialNum; ++i)
 	{
 		// マテリアル用CBV
