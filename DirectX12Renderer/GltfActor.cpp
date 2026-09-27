@@ -4,6 +4,10 @@
 #include "GltfRenderer.h"
 #include "Util.h"
 
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+
 namespace
 {
 	// モデルの正面がワールドの -Z を向いているため、+Z を向くように補正する
@@ -370,53 +374,6 @@ void GltfActor::SampleAnimation(int animIndex, float timeSec, std::vector<GltfMo
 	{
 		if (ch.times.empty()) continue;
 		GltfModel::Node& node = out[ch.targetNode];
-
-		// 現在時刻を挟む 2 キーを探す（times は昇順が保証されている）
-		size_t k1 = 0;
-		while (k1 + 1 < ch.times.size() && ch.times[k1 + 1] <= timeSec) ++k1;
-
-		DirectX::XMVECTOR value;
-		if (ch.isStep || k1 + 1 >= ch.times.size())
-		{
-			// STEP、または最後のキーより後 → 手前のキーの値をそのまま使う
-			value = DirectX::XMLoadFloat4(&ch.values[k1]);
-		}
-		else
-		{
-			const size_t k2 = k1 + 1;
-			const float span = ch.times[k2] - ch.times[k1];
-			const float t = (span > 0.0f) ? (timeSec - ch.times[k1]) / span : 0.0f;
-
-			auto v1 = DirectX::XMLoadFloat4(&ch.values[k1]);
-			auto v2 = DirectX::XMLoadFloat4(&ch.values[k2]);
-
-			// 回転はクォータニオンなので球面線形補間、位置とスケールは線形補間
-			value = (ch.path == 1)
-				? DirectX::XMQuaternionSlerp(v1, v2, t)
-				: DirectX::XMVectorLerp(v1, v2, t);
-		}
-
-		switch (ch.path)
-		{
-		case 0: DirectX::XMStoreFloat3(&node.translation, value); break;
-		case 1: DirectX::XMStoreFloat4(&node.rotation, value);    break;
-		case 2: DirectX::XMStoreFloat3(&node.scale, value);       break;
-		}
-	}
-}
-
-void GltfActor::ApplyAnimation(float timeSec)
-{
-	// バインドポーズからやり直す（動かさないノードを残すため）
-	_animNodes = _model.Nodes();
-
-	if (_currentAnimation < 0) return;
-	const GltfModel::Animation& anim = _model.Animations()[_currentAnimation];
-
-	for (const auto& ch : anim.channels)
-	{
-		if (ch.times.empty()) continue;
-		GltfModel::Node& node = _animNodes[ch.targetNode];
 
 		// 現在時刻を挟む 2 キーを探す（times は昇順が保証されている）
 		size_t k1 = 0;

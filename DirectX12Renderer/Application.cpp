@@ -391,9 +391,9 @@ void Application::BuildDebugUI()
 		_playerLogic->SetWalkSpeed(walkSpeed);
 	}
 	float runSpeed = _playerLogic->RunSpeed();
-	if (ImGui::SliderFloat("Walk Speed", &runSpeed, 0.5f, 6.0f))
+	if (ImGui::SliderFloat("Run Speed", &runSpeed, 1.0f, 12.0f))
 	{
-		_playerLogic->SetWalkSpeed(runSpeed);
+		_playerLogic->SetRunSpeed(runSpeed);
 	}
 
 	float jumpHeight = _playerController->JumpHeight();

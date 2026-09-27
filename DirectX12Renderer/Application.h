@@ -1,6 +1,9 @@
 ﻿#pragma once
+
 #include <Windows.h>
 #include <memory>
+#include <vector>
+
 #include "GameTimer.h"
 #include "Input.h"
 #include "Camera.h"
@@ -9,14 +12,14 @@ class Dx12Wrapper;
 class PMDRenderer;
 class PMDActor;
 class GltfRenderer;
-class GltfActor;
 class GltfModel;
-class DebugUI;
+class GltfActor;
+class CharacterController;
+class Player;
+class Enemy;
 class Ground;
 class Pera;
-class CharacterController;
-class Enemy;
-class Player;
+class DebugUI;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -51,37 +54,51 @@ private:
 	Application(Application&&) = delete;
 	Application& operator=(Application&&) = delete;
 
-	// ウィンドウの生成
+	// -- 初期化 --
 	bool CreateGameWindow();
 
-	WNDCLASSEX _windowClass = {};
-	HWND _hwnd = nullptr;
+	// -- 毎フレームの処理 --
+	// キャラクター同士の重なりを解消する
+	void ResolveCollisions();
+
+	// プレイヤーの攻撃が敵に当たっているかを調べる
+	void CheckAttackHits();
 
 	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
 	void BuildDebugUI();
 
-	// 重なりを解消
-	void ResolveCollisions();
+	// -- ウィンドウ --
+	WNDCLASSEX _windowClass = {};
+	HWND _hwnd = nullptr;
 
-	// ヒット判定
-	void CheckAttackHits();
-
-	// 宣言順がそのまま構築順、破棄はその逆順になる
-	// PMDActor / PMDRenderer は Dx12Wrapper を参照するので、Dx12Wrapper を先に宣言する
+	// -- 描画（宣言順がそのまま構築順、破棄はその逆順になる） --
+	// アクターは Dx12Wrapper と GltfModel を参照するので、それらを先に宣言する
 	std::unique_ptr<Dx12Wrapper> _dx12;
 	std::unique_ptr<DebugUI> _debugUI;
-	std::unique_ptr<PMDRenderer> _pmdRenderer;
-	std::unique_ptr<PMDActor> _pmdActor;
 	std::unique_ptr<GltfRenderer> _gltfRenderer;
 	std::unique_ptr<GltfModel> _gltfModel;
-	std::vector<std::unique_ptr<GltfActor>> _gltfActors;
 	std::unique_ptr<Ground> _ground;
 	std::unique_ptr<Pera> _pera;
+
+	// -- 書籍時代の PMD 描画（現在は使っていない） --
+	std::unique_ptr<PMDRenderer> _pmdRenderer;
+	std::unique_ptr<PMDActor> _pmdActor;
+
+	// -- キャラクター --
+	// 見た目(GltfActor) と 体(CharacterController) は、プレイヤーも敵も同じ配列で扱う。
+	// 描画・物理・当たり判定を、区別せずまとめてループで回せるようにするため
+	std::vector<std::unique_ptr<GltfActor>> _gltfActors;
 	std::vector<std::unique_ptr<CharacterController>> _controllers;
-	CharacterController* _playerController = nullptr;
-	GltfActor* _player = nullptr;                        // 操作対象への参照（所有しない）
+
+	// 判断を受け持つ部分。プレイヤーは 1 体だけ
 	std::unique_ptr<Player> _playerLogic;
 	std::vector<std::unique_ptr<Enemy>> _enemies;
+
+	// 上の配列の先頭を指すだけ（所有しない）
+	GltfActor* _player = nullptr;
+	CharacterController* _playerController = nullptr;
+
+	// -- その他 --
 	GameTimer _timer;
 	Input _input;
 	Camera _camera;
