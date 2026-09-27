@@ -54,8 +54,6 @@ Sphere CharacterController::BodySphere() const
 
 void CharacterController::PushXZ(float dx, float dz)
 {
-    if (!_movable) return;
-
     auto p = _actor.Position();
     p.x += dx;
     p.z += dz;

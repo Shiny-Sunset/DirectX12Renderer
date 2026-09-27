@@ -41,9 +41,10 @@ public:
     void SetRadius(float r) { _radius = r; }
     float Radius() const { return _radius; }
 
-    // 他のキャラクターに押されるか（false なら岩のように動かない）
-    void SetMovable(bool m) { _movable = m; }
-    bool IsMovable() const { return _movable; }
+    // 押し戻しの負担割合。大きいほど押されにくい
+    // （1.0 = 普通、10.0 = ほぼ動かない、0 = 完全に固定）
+    void SetPushWeight(float w) { _pushWeight = w; }
+    float PushWeight() const { return _pushWeight; }
 
 private:
     GltfActor& _actor;
@@ -58,5 +59,5 @@ private:
     static constexpr float GroundHeight = 0.0f;
 
     float _radius = 0.4f;
-    bool _movable = true;
+    float _pushWeight = 1.0f;
 };

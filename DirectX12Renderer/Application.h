@@ -15,6 +15,7 @@ class DebugUI;
 class Ground;
 class Pera;
 class CharacterController;
+class Enemy;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -78,6 +79,7 @@ private:
 	std::vector<std::unique_ptr<CharacterController>> _controllers;
 	CharacterController* _playerController = nullptr;
 	GltfActor* _player = nullptr;                        // 操作対象への参照（所有しない）
+	std::vector<std::unique_ptr<Enemy>> _enemies;
 	GameTimer _timer;
 	Input _input;
 	Camera _camera;

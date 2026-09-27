@@ -151,6 +151,7 @@
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="DebugUI.cpp" />
     <ClCompile Include="Dx12Wrapper.cpp" />
+    <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CharacterController.cpp" />
     <ClCompile Include="GameTimer.cpp" />
@@ -208,6 +209,7 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="Dx12Wrapper.h" />
+    <ClInclude Include="Enemy.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CharacterController.h" />
     <ClInclude Include="GameTimer.h" />

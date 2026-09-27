@@ -11,6 +11,7 @@
 #include "Ground.h"
 #include "Pera.h"
 #include "CharacterController.h"
+#include "Enemy.h"
 #include <tchar.h>
 #include <iostream>
 #include <algorithm>
@@ -145,17 +146,22 @@ bool Application::Init()
 	if (!_gltfModel->Init(model_path)) return false;
 
 	// -- アクターを 3 体作る --
-	const char* anims[] = { "Walk", "Idle", "Run" };
 	for (int i = 0; i < 3; ++i)
 	{
 		auto actor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer, *_gltfModel);
 		if (!actor->Init()) return false;
 		actor->SetPosition({ i * 2.0f - 2.0f, 0.0f, 0.0f });
-		actor->PlayAnimation(anims[i]);
 		_gltfActors.push_back(std::move(actor));
 
 		auto controller = std::make_unique<CharacterController>(*_gltfActors.back());
 		_controllers.push_back(std::move(controller));
+
+		// 0 番はプレイヤーなので、1 番以降を敵にする
+		if (i != 0)
+		{
+			_enemies.push_back(std::make_unique<Enemy>(
+				*_gltfActors.back(), *_controllers.back()));
+		}
 	}
 	_player = _gltfActors[0].get();
 
@@ -178,6 +184,8 @@ bool Application::Init()
 	_player->PlayAnimation("Walk");
 
 	_player->SetOutlineEnabled(false);
+
+	_playerController->SetPushWeight(5.0f);   // 敵 5 体ぶんの重さ
 
 	return true;
 }
@@ -221,12 +229,10 @@ void Application::Run()
 
 		// -- 更新処理 --
 		UpdatePlayer(dt);
-		for (auto& c : _controllers)
-		{
-			c->Update(dt);
-		}
-		ResolveCollisions();
-		for (auto& actor : _gltfActors) actor->Update(dt);
+		for (auto& e : _enemies) e->Update(dt, _player->Position());	// 敵の判断
+		for (auto& c : _controllers) c->Update(dt);	// 当たり判定
+		ResolveCollisions();	// 重なりの解消
+		for (auto& actor : _gltfActors) actor->Update(dt);	// 実際に動かす
 		//_pmdActor->Update();
 
 		_dx12->UpdateLightCamera(_player->Position());
@@ -428,6 +434,13 @@ void Application::BuildDebugUI()
 			sqrtf(dx * dx + dz * dz),
 			_controllers[0]->Radius() + _controllers[1]->Radius());
 	}
+
+	ImGui::Separator();
+	ImGui::Text("Enemies");
+	for (size_t i = 0; i < _enemies.size(); ++i)
+	{
+		ImGui::Text("#%zu: %s", i, _enemies[i]->StateName());
+	}
 	ImGui::NewLine();
 
 	ImGui::End();
@@ -497,27 +510,31 @@ void Application::UpdatePlayer(float deltaTime)
 
 void Application::ResolveCollisions()
 {
-	// 総当たりで調べる
-	for (size_t i = 0; i < _controllers.size(); ++i)
+	constexpr int Iterations = 3;
+	for (int iter = 0; iter < Iterations; ++iter)
 	{
-		for (size_t j = i + 1; j < _controllers.size(); ++j)
+		// 総当たりで調べる
+		for (size_t i = 0; i < _controllers.size(); ++i)
 		{
-			auto& a = *_controllers[i];
-			auto& b = *_controllers[j];
-
-			float pushX = 0.0f, pushZ = 0.0f;
-			if (!ResolveXZ(a.BodySphere(), b.BodySphere(), pushX, pushZ)) continue;
-
-			// 両方動けるなら半分ずつ、片方だけなら動ける側が全部負担する
-			if (a.IsMovable() && b.IsMovable())
+			for (size_t j = i + 1; j < _controllers.size(); ++j)
 			{
-				a.PushXZ(pushX * 0.5f, pushZ * 0.5f);
-				b.PushXZ(-pushX * 0.5f, -pushZ * 0.5f);
-			}
-			else
-			{
-				a.PushXZ(pushX, pushZ);
-				b.PushXZ(-pushX, -pushZ);   // 動けない側は PushXZ の中で無視される
+				auto& a = *_controllers[i];
+				auto& b = *_controllers[j];
+
+				float pushX = 0.0f, pushZ = 0.0f;
+				if (!ResolveXZ(a.BodySphere(), b.BodySphere(), pushX, pushZ)) continue;
+
+				const float wa = a.PushWeight();
+				const float wb = b.PushWeight();
+				const float total = wa + wb;
+				if (total <= 0.0f) continue;   // 両方とも不動なら何もしない
+
+				// 重い方が動かない。b が重いほど a がたくさん動く
+				const float ratioA = wb / total;
+				const float ratioB = wa / total;
+
+				a.PushXZ(pushX * ratioA, pushZ * ratioA);
+				b.PushXZ(-pushX * ratioB, -pushZ * ratioB);
 			}
 		}
 	}
