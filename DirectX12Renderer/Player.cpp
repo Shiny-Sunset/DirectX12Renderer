@@ -90,6 +90,21 @@ bool Player::IsAttackActive() const
 	return _state == State::Attack && _stateTime >= HitStart && _stateTime < HitEnd;
 }
 
+void Player::Reset(const DirectX::XMFLOAT3& pos)
+{
+	_hp = 3;
+	_state = State::Move;      // ChangeState だと同じ状態のとき何もしないので直接代入する
+	_stateTime = 0.0f;
+	_invincibleTime = 0.0f;
+
+	_actor.SetPosition(pos);
+	_actor.SetRotationY(0.0f);
+	_actor.SetVisible(true);
+	_actor.PlayAnimation("Idle", 0.0f);
+
+	_controller.Reset();
+}
+
 void Player::ChangeState(State next)
 {
 	if (_state == next) return;

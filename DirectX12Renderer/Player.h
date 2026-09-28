@@ -44,6 +44,8 @@ public:
     // 1 回の振りごとの通し番号。同じ振りで同じ敵に何度も当てないために使う
     unsigned int AttackId() const { return _attackId; }
 
+    void Reset(const DirectX::XMFLOAT3& pos);
+
     // -- 調整値（ImGui から変更する） --
     void SetWalkSpeed(float s) { _walkSpeed = s; }
     float WalkSpeed() const { return _walkSpeed; }

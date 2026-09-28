@@ -13,6 +13,7 @@
 #include "CharacterController.h"
 #include "Enemy.h"
 #include "Player.h"
+#include "Stage.h"
 #include <tchar.h>
 #include <iostream>
 #include <algorithm>
@@ -47,6 +48,12 @@ namespace
 		return DefWindowProc(hwnd, msg, wparam, lparam);
 	}
 	constexpr float TurnSpeed = 12.0f;   // 向きを合わせる速さ
+
+	constexpr DirectX::XMFLOAT3 SpawnPositions[] = {
+			  { -2.0f, 0.0f, 0.0f },   // [0] プレイヤー
+			  {  0.0f, 0.0f, 0.0f },   // [1] 敵
+			  {  2.0f, 0.0f, 0.0f },   // [2] 敵
+	};
 }
 
 Application& Application::Instance()
@@ -133,6 +140,10 @@ bool Application::Init()
 	_ground = std::make_unique<Ground>(*_dx12);
 	if (!_ground->Init()) return false;
 
+	// -- Stageの作成 --
+	_stage = std::make_unique<Stage>(*_dx12, *_gltfRenderer);
+	if (!_stage->Init()) return false;
+
 	// -- マルチパスレンダリング用の板ポリの作成 --
 	_pera = std::make_unique<Pera>(*_dx12);
 	if (!_pera->Init()) return false;
@@ -151,7 +162,7 @@ bool Application::Init()
 	{
 		auto actor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer, *_gltfModel);
 		if (!actor->Init()) return false;
-		actor->SetPosition({ i * 2.0f - 2.0f, 0.0f, 0.0f });
+		actor->SetPosition(SpawnPositions[i]);
 		_gltfActors.push_back(std::move(actor));
 
 		auto controller = std::make_unique<CharacterController>(*_gltfActors.back());
@@ -190,6 +201,8 @@ bool Application::Init()
 
 	_playerController->SetPushWeight(5.0f);   // 敵 5 体ぶんの重さ
 
+	for (auto& actor : _gltfActors) actor->Update(0.0f);
+
 	return true;
 }
 
@@ -219,50 +232,82 @@ void Application::Run()
 
 		_input.Update();
 		const float dt = _timer.Tick();
+		_gameStateTime += dt;
 
 		// -- 入力 --
-		const bool uiHasKeyboard = _debugUI->WantCaptureKeyboard();
-		if (!uiHasKeyboard)
+		const bool uiFree = !_debugUI->WantCaptureKeyboard();
+
+		switch (_gameState)
 		{
-			if (_input.IsTriggered('O')) _player->SetOutlineEnabled(!_player->IsOutlineEnabled());
-			if (_input.IsTriggered('1')) _player->PlayAnimation("Idle");
-			if (_input.IsTriggered('2')) _player->PlayAnimation("Walk");
-			if (_input.IsTriggered('3')) _player->PlayAnimation("Run");
+		case GameState::Title:
+			if (uiFree && _input.IsTriggered(VK_SPACE))
+			{
+				ChangeGameState(GameState::Playing);
+			}
+			break;
+
+		case GameState::Clear:
+		case GameState::GameOver:
+			// 押しっぱなしで即スキップされないよう、少し待ってから受け付ける
+			if (_gameStateTime > 1.0f && uiFree && _input.IsTriggered('R'))
+			{
+				RestartGame();   // 段階 B で実装
+			}
+			break;
+
+		default:
+			break;
 		}
 
 		// -- 更新処理 --
-		_playerLogic->Update(dt, _input, _camera.Yaw(), !_debugUI->WantCaptureKeyboard());
-		for (auto& e : _enemies) e->Update(dt, _player->Position());	// 敵の判断
-		CheckAttackHits();	// ヒット判定
-		for (auto& c : _controllers) c->Update(dt);	// コリジョン更新
-		ResolveCollisions();	// 重なりの解消
-		// 敵の攻撃がプレイヤーに当たっているか
-		for (auto& e : _enemies)
+		if (_gameState == GameState::Playing)
 		{
-			if (!e->IsAttackActive()) continue;
-			if (!Intersects(e->AttackSphere(), _playerLogic->BodySphere())) continue;
-			_playerLogic->TakeDamage(1);
-		}
-		for (auto& actor : _gltfActors) actor->Update(dt);	// 実際に動かす
-		//_pmdActor->Update();
+			_playerLogic->Update(dt, _input, _camera.Yaw(), !_debugUI->WantCaptureKeyboard());
+			for (auto& e : _enemies) e->Update(dt, _player->Position());	// 敵の判断
+			CheckAttackHits();	// ヒット判定
+			// 床の高さを先に教えてから動かす
+			for (auto& c : _controllers)
+			{
+				const auto& p = c->Position();   // または既存の取得方法
+				c->SetGroundHeight(_stage->GroundHeightAt(p.x, p.z, p.y + 0.05f));
+			}
+			for (auto& c : _controllers) c->Update(dt);	// コリジョン更新
+			for (auto& c : _controllers) _stage->Resolve(*c);
+			ResolveCollisions();	// 重なりの解消
+			// 敵の攻撃がプレイヤーに当たっているか
+			for (auto& e : _enemies)
+			{
+				if (!e->IsAttackActive()) continue;
+				if (!Intersects(e->AttackSphere(), _playerLogic->BodySphere())) continue;
+				_playerLogic->TakeDamage(1);
+			}
 
-		_dx12->UpdateLightCamera(_player->Position());
+			for (auto& actor : _gltfActors) actor->Update(dt);	// 実際に動かす
+			//_pmdActor->Update();
 
-		if (!_debugUI->WantCaptureMouse())
-		{
-			_camera.Update(_input, dt, _player->Position());
+			_dx12->UpdateLightCamera(_player->Position());
+
+			if (!_debugUI->WantCaptureMouse())
+			{
+				_camera.Update(_input, dt, _player->Position());
+			}
+			_dx12->SetCamera(_camera.Eye(), _camera.Focus(), 0.1f, 100.0f);
+
+			CheckGameEnd();
 		}
-		_dx12->SetCamera(_camera.Eye(), _camera.Focus(), 0.1f, 100.0f);
+		
 
 		// -- デバッグ UI の組み立て --
 		_debugUI->BeginFrame();
 		BuildDebugUI();
+		BuildGameUI();
 		_debugUI->EndFrame();
 
 		// -- 描画処理 --
 		// -- 0 パス目：影 --
 		_dx12->BeginShadowPass();
 		for (auto& actor : _gltfActors) actor->DrawShadow();
+		_stage->DrawShadow();
 		_dx12->EndShadowPass();
 		
 		// -- 1 パス目：シーンをテクスチャへ --
@@ -270,6 +315,7 @@ void Application::Run()
 		//_pmdRenderer->BeforeDraw();
 		//_pmdActor->Draw
 		_ground->Draw();
+		_stage->Draw();
 		_gltfRenderer->BeforeDraw();
 		for (auto& actor : _gltfActors) actor->Draw();
 		_dx12->EndOffscreenPass();
@@ -298,6 +344,7 @@ void Application::Terminate()
 	_gltfModel.reset();        // アクターが参照し終わってから解放
 	_gltfRenderer.reset();
 	_ground.reset();
+	_stage.reset();
 	_pera.reset();
 	_dx12.reset();
 
@@ -424,17 +471,6 @@ void Application::BuildDebugUI()
 	ImGui::Text("Blend: %.2f", _player->BlendWeight());
 	ImGui::Separator();
 
-	ImGui::Text("Animation");
-	for (const char* name : { "Idle", "Walk", "Run", "Eat_loop", "Curl_up_loop" })
-	{
-		if (ImGui::Button(name))
-		{
-			_player->PlayAnimation(name);
-		}
-		ImGui::SameLine();
-	}
-
-	ImGui::Separator();
 	ImGui::Text("Collision");
 
 	float radius = _playerController->Radius();
@@ -472,6 +508,51 @@ void Application::BuildDebugUI()
 
 	// ImGui で何ができるかの見本（慣れたら消す）
 	ImGui::ShowDemoWindow();
+}
+
+void Application::BuildGameUI()
+{
+	const auto& io = ImGui::GetIO();
+
+	// -- プレイ中の情報表示（左上） --
+	if (_gameState == GameState::Playing)
+	{
+		ImGui::SetNextWindowPos(ImVec2(20, 20));
+		ImGui::Begin("HUD", nullptr,
+			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+			ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs);
+
+		ImGui::Text("HP  %d", _playerLogic->HP());
+		ImGui::Text("Enemy  %d", AliveEnemyCount());
+
+		ImGui::End();
+		return;
+	}
+
+	// -- タイトル・結果表示（中央） --
+	const char* title = "";
+	const char* guide = "";
+	switch (_gameState)
+	{
+	case GameState::Title:    title = "DANGO GIRL";  guide = "Space  -  Start"; break;
+	case GameState::Clear:    title = "CLEAR!";      guide = "R  -  Retry";     break;
+	case GameState::GameOver: title = "GAME OVER";   guide = "R  -  Retry";     break;
+	default: break;
+	}
+
+	ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
+		ImGuiCond_Always, ImVec2(0.5f, 0.5f));   // 第 3 引数で「窓の中心」を基準にする
+	ImGui::Begin("Message", nullptr,
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
+		ImGuiWindowFlags_NoBackground);
+
+	ImGui::SetWindowFontScale(3.0f);
+	ImGui::Text("%s", title);
+	ImGui::SetWindowFontScale(1.5f);
+	ImGui::Text("%s", guide);
+
+	ImGui::End();
 }
 
 void Application::ResolveCollisions()
@@ -520,4 +601,57 @@ void Application::CheckAttackHits()
 
 		e->TakeDamage(1, _playerLogic->AttackId(), pp.x, pp.z);
 	}
+}
+
+void Application::CheckGameEnd()
+{
+	// プレイヤーが死んだ
+	if (_playerLogic->CurrentState() == Player::State::Dead)
+	{
+		ChangeGameState(GameState::GameOver);
+		return;
+	}
+
+	// 敵が全滅した
+	bool allDead = true;
+	for (const auto& e : _enemies)
+	{
+		if (!e->IsDead()) { allDead = false; break; }
+	}
+	if (allDead)
+	{
+		ChangeGameState(GameState::Clear);
+	}
+}
+
+void Application::ChangeGameState(GameState next)
+{
+	if (_gameState == next) return;
+	_gameState = next;
+	_gameStateTime = 0.0f;
+}
+
+void Application::RestartGame()
+{
+	// 初期位置は Init と同じ式を使う（2 か所に散らばらないよう定数化しておくとなお良い）
+	_playerLogic->Reset(SpawnPositions[0]);
+
+	for (size_t i = 0; i < _enemies.size(); ++i)
+	{
+		_enemies[i]->Reset(SpawnPositions[i + 1]);   // 敵は [1] から
+	}
+
+	for (auto& actor : _gltfActors) actor->Update(0.0f);
+
+	ChangeGameState(GameState::Playing);
+}
+
+int Application::AliveEnemyCount()
+{
+	int cnt = 0;
+	for (const auto& e : _enemies)
+	{
+		if (!e->IsDead()) ++cnt;
+	}
+	return cnt;
 }

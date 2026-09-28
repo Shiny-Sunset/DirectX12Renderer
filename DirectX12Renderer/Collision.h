@@ -8,6 +8,14 @@ struct Sphere
     float radius;
 };
 
+// 軸に沿った直方体（Axis-Aligned Bounding Box）
+// 回転しない箱なので、判定が「各軸の範囲に入っているか」だけで済む
+struct AABB
+{
+    DirectX::XMFLOAT3 min;   // 各軸の最小値
+    DirectX::XMFLOAT3 max;   // 各軸の最大値
+};
+
 // 2 つの球が交差しているか
 bool Intersects(const Sphere& a, const Sphere& b);
 
@@ -19,3 +27,8 @@ bool Intersects(const Sphere& a, const Sphere& b);
 // @param outPushZ 押し出す量（Z）
 // @return 重なっていて押し出しが必要なら true
 bool ResolveXZ(const Sphere& a, const Sphere& b, float& outPushX, float& outPushZ);
+
+// 球と箱の重なりを解消する
+// @param outPush 球を押し出す量（3 軸）
+// @return 重なっていて押し出しが必要なら true
+bool ResolveSphereVsAABB(const Sphere& s, const AABB& b, DirectX::XMFLOAT3& outPush);

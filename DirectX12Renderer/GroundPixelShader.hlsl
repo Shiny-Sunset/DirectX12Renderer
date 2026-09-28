@@ -1,9 +1,8 @@
 #include "GroundShaderHeader.hlsli"
+#include "ShadowCommon.hlsli"
 
 float4 GroundPS(GroundOutput input) : SV_TARGET
 {
-    static const float ShadowBias = 0.005;
-
     // -- 格子模様（元のコード） --
     float2 uv = input.worldPos.xz;
     float2 width = fwidth(uv);
@@ -18,11 +17,7 @@ float4 GroundPS(GroundOutput input) : SV_TARGET
     float3 posFromLight = input.tpos.xyz / input.tpos.w;
     float2 shadowUV = (posFromLight.xy + float2(1, -1)) * float2(0.5, -0.5);
 
-    // 比較とフィルタリングを GPU がまとめて行う
-    // 戻り値は「光が当たっている割合」で、0〜1 の中間値になる
-    float lit = shadowMap.SampleCmpLevelZero(shadowSmp, shadowUV, posFromLight.z - ShadowBias);
-
-    float shadowWeight = lerp(0.5, 1.0, lit);
-
-    return float4(color * shadowWeight, 1.0);
+    // 地面は常に真上を向いている
+    float brightness = ComputeBrightness(float3(0, 1, 0), lightVec, input.tpos, shadowMap, shadowSmp);
+    return float4(color * brightness, 1.0);
 }

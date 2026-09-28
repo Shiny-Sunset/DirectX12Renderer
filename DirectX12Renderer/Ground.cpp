@@ -147,7 +147,7 @@ bool Ground::CreateRootSignature()
     // 0 番: シーンの定数バッファ(b0)
     rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParam[0].Descriptor.ShaderRegister = 0;
-    rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+    rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // 1 番: シャドウマップ(t0)。ピクセルシェーダーで読む
     rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;

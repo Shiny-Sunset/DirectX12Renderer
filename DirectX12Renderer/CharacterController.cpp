@@ -21,10 +21,13 @@ void CharacterController::Update(float deltaTime)
     pos.y += _velocity.y * deltaTime;
     pos.z += _velocity.z * deltaTime;
 
+    if (_grounded) _coyoteTime = 0.1f;
+    else _coyoteTime = std::max(0.0f, _coyoteTime - deltaTime);
+
     // -- 地面より下へ行ったら押し戻す --
-    if (pos.y <= GroundHeight)
+    if (pos.y <= _groundHeight)
     {
-        pos.y = GroundHeight;
+        pos.y = _groundHeight;
         _velocity.y = 0.0f;
         _grounded = true;
     }
@@ -38,12 +41,13 @@ void CharacterController::Update(float deltaTime)
 
 void CharacterController::Jump()
 {
-    if (!_grounded) return;   // 空中では跳べない
+    if (!_coyoteTime > 0.0f) return;   // 空中では跳べない
 
     // 「高さ h に到達する初速」を物理の式から求める
     //   v = √(2 × g × h)
     _velocity.y = sqrtf(2.0f * fabsf(_gravity) * _jumpHeight);
     _grounded = false;
+    _coyoteTime = 0.0f;
 }
 
 Sphere CharacterController::BodySphere() const
@@ -58,4 +62,28 @@ void CharacterController::PushXZ(float dx, float dz)
     p.x += dx;
     p.z += dz;
     _actor.SetPosition(p);
+}
+
+void CharacterController::LandOn(float groundY)
+{
+    auto p = _actor.Position();
+    p.y = groundY;
+    _actor.SetPosition(p);
+
+    _velocity.y = 0.0f;
+    _grounded = true;
+}
+
+void CharacterController::Push(float dx, float dy, float dz)
+{
+    auto p = _actor.Position();
+    p.x += dx;
+    p.y += dy;
+    p.z += dz;
+    _actor.SetPosition(p);
+}
+
+const DirectX::XMFLOAT3& CharacterController::Position() const
+{
+    return _actor.Position();   // アクターが持っている実体への参照をそのまま返す
 }

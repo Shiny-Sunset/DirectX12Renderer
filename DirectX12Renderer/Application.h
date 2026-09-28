@@ -19,6 +19,7 @@ class Player;
 class Enemy;
 class Ground;
 class Pera;
+class Stage;
 class DebugUI;
 
 // アプリケーション全体を受け持つシングルトンクラス
@@ -26,6 +27,14 @@ class DebugUI;
 class Application
 {
 public:
+	enum class GameState
+	{
+		Title,      // タイトル画面。開始待ち
+		Playing,    // プレイ中
+		Clear,      // 敵を全滅させた
+		GameOver,   // プレイヤーの HP が 0 になった
+	};
+
 	// 唯一のインスタンスを返す
 	static Application& Instance();
 
@@ -64,8 +73,18 @@ private:
 	// プレイヤーの攻撃が敵に当たっているかを調べる
 	void CheckAttackHits();
 
+	void CheckGameEnd();
+
+	void ChangeGameState(GameState next);
+
+	void RestartGame();
+
+	int AliveEnemyCount();
+
 	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
 	void BuildDebugUI();
+
+	void BuildGameUI();
 
 	// -- ウィンドウ --
 	WNDCLASSEX _windowClass = {};
@@ -79,6 +98,7 @@ private:
 	std::unique_ptr<GltfModel> _gltfModel;
 	std::unique_ptr<Ground> _ground;
 	std::unique_ptr<Pera> _pera;
+	std::unique_ptr<Stage> _stage;
 
 	// -- 書籍時代の PMD 描画（現在は使っていない） --
 	std::unique_ptr<PMDRenderer> _pmdRenderer;
@@ -102,4 +122,7 @@ private:
 	GameTimer _timer;
 	Input _input;
 	Camera _camera;
+
+	GameState _gameState = GameState::Title;
+	float _gameStateTime = 0.0f;
 };

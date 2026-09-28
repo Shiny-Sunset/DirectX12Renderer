@@ -165,6 +165,7 @@
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="PMDActor.cpp" />
     <ClCompile Include="PMDRenderer.cpp" />
+    <ClCompile Include="Stage.cpp" />
     <ClCompile Include="Util.cpp" />
   </ItemGroup>
   <!-- Dear ImGui（サードパーティ。ソースは編集しないこと）
@@ -221,6 +222,7 @@
     <ClInclude Include="Player.h" />
     <ClInclude Include="PMDActor.h" />
     <ClInclude Include="PMDRenderer.h" />
+    <ClInclude Include="Stage.h" />
     <ClInclude Include="Util.h" />
   </ItemGroup>
   <ItemGroup>
@@ -269,6 +271,11 @@
     <None Include="PeraShaderHeader.hlsli" />
     <None Include="PeraVertexShader.hlsl" />
     <None Include="PeraPixelShader.hlsl" />
+    <None Include="ShadowCommon.hlsli" />
+    <None Include="StageShaderHeader.hlsli" />
+    <None Include="StageVertexShader.hlsl" />
+    <None Include="StagePixelShader.hlsl" />
+    <None Include="StageShadowVertexShader.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

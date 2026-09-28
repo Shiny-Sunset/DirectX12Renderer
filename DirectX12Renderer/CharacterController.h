@@ -36,6 +36,20 @@ public:
     // 押し戻し（水平方向のみ）
     void PushXZ(float dx, float dz);
 
+    // 押し戻された結果、足場の上に乗った
+    // @param groundY 足を置く高さ
+    void LandOn(float groundY);
+
+    // 押し戻し（3 軸）
+    void Push(float dx, float dy, float dz);
+
+    void Reset()
+    {
+        _velocity = { 0.0f, 0.0f, 0.0f };
+        _grounded = true;
+        _pushWeight = 1.0f;   // 死亡時に 0 にしているので戻す
+    }
+
     // -- 調整値 --
     void SetJumpHeight(float h) { _jumpHeight = h; }
     float JumpHeight() const { return _jumpHeight; }
@@ -49,10 +63,15 @@ public:
     void SetPushWeight(float w) { _pushWeight = w; }
     float PushWeight() const { return _pushWeight; }
 
-private:
-    // 地面の高さ。地形の当たり判定を入れるまでは平らな床として扱う
-    static constexpr float GroundHeight = 0.0f;
+    // 今いる場所の床の高さ（毎フレーム、ステージから教えてもらう）
+    void SetGroundHeight(float y) { _groundHeight = y; }
 
+    const DirectX::XMFLOAT3& Position() const;
+
+    float VelocityX() const { return _velocity.x; }
+    float VelocityZ() const { return _velocity.z; }
+
+private:
     // -- 参照するもの（所有しない） --
     GltfActor& _actor;
 
@@ -65,4 +84,6 @@ private:
     float _jumpHeight = 1.2f;    // ジャンプの最高到達点（m）
     float _radius = 0.4f;        // 当たり判定の球の半径（m）
     float _pushWeight = 1.0f;    // 押し戻しの負担割合
+    float _groundHeight = 0.0f; // 地面の高さ
+    float _coyoteTime = 0.0f;
 };

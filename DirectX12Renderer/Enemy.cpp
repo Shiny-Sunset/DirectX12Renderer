@@ -148,6 +148,22 @@ bool Enemy::IsAttackActive() const
         && _stateTime < AttackHitTime + 0.1f;
 }
 
+void Enemy::Reset(const DirectX::XMFLOAT3& pos)
+{
+    _hp = 2;
+    _cooldown = 0.0f;
+    _lastHitAttackId = 0;
+    _state = State::Idle;      // ChangeState だと同じ状態のとき何もしないので直接代入する
+    _stateTime = 0.0f;
+
+    _actor.SetPosition(pos);
+    _actor.SetRotationY(0.0f);
+    _actor.SetVisible(true);
+    _actor.PlayAnimation("Idle", 0.0f);
+
+    _controller.Reset();
+}
+
 void Enemy::ChangeState(State next)
 {
     if (_state == next) return;   // 同じ状態なら何もしない

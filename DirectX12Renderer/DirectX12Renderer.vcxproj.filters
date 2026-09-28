@@ -81,6 +81,21 @@
     <ClCompile Include="GltfModel.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Collision.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Enemy.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterController.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Player.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Stage.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="BasicVertexShader.hlsl">
@@ -89,6 +104,8 @@
     <FxCompile Include="BasicPixelShader.hlsl">
       <Filter>ソース ファイル</Filter>
     </FxCompile>
+    <FxCompile Include="StageVertexShader.hlsl" />
+    <FxCompile Include="StagePixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="BasicShaderHeader.hlsli">
@@ -108,6 +125,7 @@
     <None Include="GltfShadowVertexShader.hlsl" />
     <None Include="PeraVertexShader.hlsl" />
     <None Include="PeraPixelShader.hlsl" />
+    <None Include="StageShaderHeader.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h">
@@ -174,6 +192,21 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="GltfModel.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Collision.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Enemy.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterController.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Player.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Stage.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

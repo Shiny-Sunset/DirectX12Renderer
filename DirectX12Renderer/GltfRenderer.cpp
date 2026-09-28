@@ -320,7 +320,7 @@ bool GltfRenderer::CreateGraphicsPipeline()
 	gpipeline.NumRenderTargets = 0;
 	gpipeline.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 	gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_FRONT;
+	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
 
 	result = _dx12.Device()->CreateGraphicsPipelineState(
 		&gpipeline, IID_PPV_ARGS(&_shadowPipelineState)

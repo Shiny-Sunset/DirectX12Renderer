@@ -44,6 +44,8 @@ public:
     Sphere AttackSphere() const;   // 攻撃の判定（アクティブな時間だけ意味を持つ）
     bool IsAttackActive() const;   // 攻撃判定が出ている時間か
 
+    void Reset(const DirectX::XMFLOAT3& pos);
+
 private:
     // -- 内部処理 --
     // 状態を切り替える（アニメーションの変更もここでまとめて行う）
