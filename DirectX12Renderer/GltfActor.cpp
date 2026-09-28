@@ -100,19 +100,23 @@ void GltfActor::Draw()
 	ID3D12DescriptorHeap* heaps[] = { _descHeap.Get() };
 	cmdList->SetDescriptorHeaps(1, heaps);
 
+	auto incSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 	// ヒープの先頭ハンドル(0 番 = シーン用の定数バッファ)
 	auto heapH = _descHeap->GetGPUDescriptorHandleForHeapStart();
 
 	// ルートパラメーター 0 番に行列(b0)を関連付ける
-	cmdList->SetGraphicsRootDescriptorTable(0, heapH);
+	auto handle = heapH;
+	cmdList->SetGraphicsRootDescriptorTable(0, handle);
+
+	handle.ptr += incSize * 2;                            // [2] がシャドウマップ
+	cmdList->SetGraphicsRootDescriptorTable(2, handle);
 
 	// 頂点バッファの設定
 	cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
 
 	// インデックスバッファの設定
 	cmdList->IASetIndexBuffer(&_model.IndexBufferView());
-
-	auto incSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	
 	// プリミティブごとに、担当する範囲だけを描く
 	// 0 周目: 輪郭線
@@ -138,8 +142,8 @@ void GltfActor::Draw()
 		if (p.isBlend) continue;        // ← この行が抜けている
 
 		auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
-		auto handle = heapH;
-		handle.ptr += incSize * (2 + matIdx * GltfModel::DescriptorsPerMaterial);
+		handle = heapH;
+		handle.ptr += incSize * (3 + matIdx * GltfModel::DescriptorsPerMaterial);
 		cmdList->SetGraphicsRootDescriptorTable(1, handle);
 
 		cmdList->DrawIndexedInstanced(
@@ -154,8 +158,8 @@ void GltfActor::Draw()
 		if (!p.isBlend) continue;
 
 		auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
-		auto handle = heapH;
-		handle.ptr += incSize * (2 + matIdx * GltfModel::DescriptorsPerMaterial);
+		handle = heapH;
+		handle.ptr += incSize * (3 + matIdx * GltfModel::DescriptorsPerMaterial);
 		cmdList->SetGraphicsRootDescriptorTable(1, handle);
 
 		cmdList->DrawIndexedInstanced(
@@ -201,7 +205,7 @@ bool GltfActor::CreateMaterialAndTextureView()
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
 	// 先頭はシーン用の定数バッファ(b0)、続いてボーン行列(b1)、それ以降がマテリアル(b2)
-	descHeapDesc.NumDescriptors = static_cast<UINT>(_model.MaterialCount()) * GltfModel::DescriptorsPerMaterial + 2;
+	descHeapDesc.NumDescriptors = static_cast<UINT>(_model.MaterialCount()) * GltfModel::DescriptorsPerMaterial + 3;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
 	auto result = device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&_descHeap));
@@ -239,7 +243,11 @@ bool GltfActor::CreateMaterialAndTextureView()
 	device->CreateConstantBufferView(&transformCBVDesc, handle);
 	handle.ptr += incSize;
 
-	// 3 番目以降にマテリアルの定数バッファビュー(b2)をマテリアル数ぶん並べる
+	// [2] シャドウマップ用のSRV(t1)
+	_dx12.CreateShadowMapView(handle);
+	handle.ptr += incSize;
+
+	// [3] 以降にマテリアルの定数バッファビュー(b2)をマテリアル数ぶん並べる
 	// テクスチャが指定されていないマテリアルには、既定の白テクスチャを割り当てる
 	for (UINT i = 0; i < materialNum; ++i)
 	{

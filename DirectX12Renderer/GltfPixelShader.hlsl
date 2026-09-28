@@ -1,4 +1,5 @@
 #include "GltfShaderHeader.hlsli"
+#include "ShadowCommon.hlsli"
 
 float4 GltfPS(Output input) : SV_TARGET
 {
@@ -24,8 +25,15 @@ float4 GltfPS(Output input) : SV_TARGET
     float f = halfLambert * steps;
     float toon = saturate((floor(f) + smoothstep(0.0, 0.08, frac(f))) / (steps - 1.0));
     
+    // 影の中かどうかを調べる
+    float lit = ComputeShadowLit(input.tpos, ndotl, shadowMap, shadowSmp);
+    
+    // 影に入っていたら、トゥーンの暗い側へ寄せる
+    // min を使うのは、階調を保ったまま「暗い方を採用」するため
+    float shade = min(toon, lit);
+    
     // 影側が真っ黒にならないよう下限を設ける
-    float brightness = lerp(shadowLevel, 1.0, toon);
+    float brightness = lerp(shadowLevel, 1.0, shade);
 
     return float4(albedo * brightness, alpha);
 }

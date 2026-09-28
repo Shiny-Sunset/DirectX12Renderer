@@ -118,6 +118,10 @@ public:
 	ID3D12Resource* BlackTexture() const { return _blackTex.Get(); }
 	ID3D12Resource* GradTexture() const { return _gradTex.Get(); }
 
+	// シャドウマップの SRV を、指定されたハンドルの位置に作る
+	// 各アクターが自分のヒープの中に作るために使う
+	void CreateShadowMapView(D3D12_CPU_DESCRIPTOR_HANDLE handle);
+
 	// ------------------------------------------------------------
 	// 設定
 	// ------------------------------------------------------------
@@ -157,11 +161,13 @@ private:
 		DirectX::XMFLOAT3 eye;           // 視点座標
 		float _pad0;
 		DirectX::XMFLOAT3 lightVec;      // 光が進む向き
-		float _pad1;
+		float shadowMapTexel;            // シャドウマップ 1 テクセルの UV 幅（1 / 解像度）
+		float lightRange;                // 光源カメラの深度範囲（far - near）
+		float _pad1[3];
 	};
 
 	// シャドウマップの解像度
-	static constexpr UINT ShadowMapSize = 2048;
+	static constexpr UINT ShadowMapSize = 4096;
 
 	// -- 初期化のサブルーチン（Init から順に呼ばれる） --
 	bool InitializeDXGIDevice();

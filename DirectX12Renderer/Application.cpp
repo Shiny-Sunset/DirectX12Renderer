@@ -412,6 +412,21 @@ void Application::BuildDebugUI()
 	}
 
 	ImGui::Separator();
+	ImGui::Text("Camera");
+
+	float distance = _camera.Distance();
+	if (ImGui::SliderFloat("Distance", &distance, 0.5f, 12.0f))
+	{
+		_camera.SetDistance(distance);
+	}
+
+	float height = _camera.Height();
+	if (ImGui::SliderFloat("Height", &height, 0.0f, 3.0f))
+	{
+		_camera.SetHeight(height);
+	}
+
+	ImGui::Separator();
 
 	ImGui::Text("Transform");
 

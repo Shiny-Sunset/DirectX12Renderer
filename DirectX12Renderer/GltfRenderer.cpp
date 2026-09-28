@@ -95,29 +95,35 @@ bool GltfRenderer::CompileShaders()
 bool GltfRenderer::CreateRootSignature()
 {
 	// ディスクリプタレンジの作成
-	D3D12_DESCRIPTOR_RANGE descTblRange[3] = {};
+	D3D12_DESCRIPTOR_RANGE descTblRange[4] = {};
 
 	// b0: シーン行列
 	// b1: ボーン行列
 	descTblRange[0].NumDescriptors = 2;
 	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRange[0].BaseShaderRegister = 0;
+	descTblRange[0].BaseShaderRegister = 0;	// b0
 	descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// b2: マテリアル
 	descTblRange[1].NumDescriptors = 1;
 	descTblRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRange[1].BaseShaderRegister = 2;
+	descTblRange[1].BaseShaderRegister = 2;	// b2
 	descTblRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// t0: baseColor テクスチャ
 	descTblRange[2].NumDescriptors = 1;
 	descTblRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descTblRange[2].BaseShaderRegister = 0;
+	descTblRange[2].BaseShaderRegister = 0;	// t0
 	descTblRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	// t1: シャドウマップ
+	descTblRange[3].NumDescriptors = 1;
+	descTblRange[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descTblRange[3].BaseShaderRegister = 1;   // t1
+	descTblRange[3].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
 	// ルートパラメーター(ディスクリプタテーブル)の作成
-	D3D12_ROOT_PARAMETER rootParam[2] = {};
+	D3D12_ROOT_PARAMETER rootParam[3] = {};
 
 	// 0 番: 行列(b0)。描画中は変わらないので 1 回だけ設定する
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -137,10 +143,16 @@ bool GltfRenderer::CreateRootSignature()
 	rootParam[1].DescriptorTable.NumDescriptorRanges = 2;
 	// すべてのシェーダーから見える
 	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	// 2 番: シャドウマップ
+	rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[2].DescriptorTable.pDescriptorRanges = &descTblRange[3];
+	rootParam[2].DescriptorTable.NumDescriptorRanges = 1;
+	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	
 
 	// サンプラーの作成
-	D3D12_STATIC_SAMPLER_DESC samplerDesc[1] = {};
+	D3D12_STATIC_SAMPLER_DESC samplerDesc[2] = {};
 
 	samplerDesc[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;      // 横方向の繰り返し
 	samplerDesc[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;      // 縦方向の繰り返し
@@ -153,13 +165,23 @@ bool GltfRenderer::CreateRootSignature()
 	samplerDesc[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
 	samplerDesc[0].ShaderRegister = 0;
 
+	samplerDesc[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+	samplerDesc[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+	samplerDesc[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	samplerDesc[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+	samplerDesc[1].Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR;
+	samplerDesc[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	samplerDesc[1].MaxLOD = D3D12_FLOAT32_MAX;
+	samplerDesc[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	samplerDesc[1].ShaderRegister = 1;
+
 	// ルートシグネチャの作成
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	rootSignatureDesc.pParameters = &rootParam[0];	// ルートパラメーターの先頭アドレス
-	rootSignatureDesc.NumParameters = 2;	// ルートパラメーター数
+	rootSignatureDesc.NumParameters = 3;	// ルートパラメーター数
 	rootSignatureDesc.pStaticSamplers = samplerDesc;
-	rootSignatureDesc.NumStaticSamplers = 1;
+	rootSignatureDesc.NumStaticSamplers = 2;
 
 	// バイナリコードの作成
 	ComPtr<ID3DBlob> rootSigBlob;
@@ -320,7 +342,7 @@ bool GltfRenderer::CreateGraphicsPipeline()
 	gpipeline.NumRenderTargets = 0;
 	gpipeline.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 	gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+	gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 
 	result = _dx12.Device()->CreateGraphicsPipelineState(
 		&gpipeline, IID_PPV_ARGS(&_shadowPipelineState)

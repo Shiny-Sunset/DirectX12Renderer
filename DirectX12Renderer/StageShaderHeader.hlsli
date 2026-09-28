@@ -6,7 +6,9 @@ cbuffer SceneBuffer : register(b0)
     float3 eye;
     float _pad0;
     float3 lightVec;
-    float _pad1;
+    float shadowMapTexel;
+    float lightRange;
+    float3 _pad1;
 };
 
 cbuffer TransformBuffer : register(b1)

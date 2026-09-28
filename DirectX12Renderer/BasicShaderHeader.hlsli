@@ -16,7 +16,7 @@ Texture2D<float4> toon : register(t3); // 3 番スロットに設定されたテ
 SamplerState smp : register(s0); // 0 番スロット設定されたサンプラー
 SamplerState smpToon : register(s1); // 1 番スロット設定されたサンプラー(トゥーン用)
 
-cbuffer cbuff0 : register(b0)   // 定数バッファ(シーン共通)
+cbuffer cbuff0 : register(b0)
 {
     matrix view;
     matrix proj;
@@ -24,7 +24,9 @@ cbuffer cbuff0 : register(b0)   // 定数バッファ(シーン共通)
     float3 eye;
     float _pad0;
     float3 lightVec;
-    float _pad1;
+    float shadowMapTexel;
+    float lightRange;
+    float3 _pad1;
 };
 
 // モデル固有の行列

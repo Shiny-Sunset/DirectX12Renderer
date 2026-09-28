@@ -104,14 +104,9 @@
     <FxCompile Include="BasicPixelShader.hlsl">
       <Filter>ソース ファイル</Filter>
     </FxCompile>
-    <FxCompile Include="StageVertexShader.hlsl" />
-    <FxCompile Include="StagePixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="BasicShaderHeader.hlsli">
-      <Filter>ソース ファイル</Filter>
-    </None>
-    <None Include="GltfShaderHeader.hlsli">
       <Filter>ソース ファイル</Filter>
     </None>
     <None Include="GltfVertexShader.hlsl" />
@@ -126,6 +121,11 @@
     <None Include="PeraVertexShader.hlsl" />
     <None Include="PeraPixelShader.hlsl" />
     <None Include="StageShaderHeader.hlsli" />
+    <None Include="ShadowCommon.hlsli" />
+    <None Include="StageVertexShader.hlsl" />
+    <None Include="StagePixelShader.hlsl" />
+    <None Include="StageShadowVertexShader.hlsl" />
+    <None Include="GltfShaderHeader.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h">

@@ -551,6 +551,17 @@ void Dx12Wrapper::CreateSceneConstantBufferView(D3D12_CPU_DESCRIPTOR_HANDLE hand
 	_dev->CreateConstantBufferView(&matrixCBVDesc, handle);
 }
 
+void Dx12Wrapper::CreateShadowMapView(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Format = DXGI_FORMAT_R32_FLOAT;   // TYPELESS を数値テクスチャとして読む
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	_dev->CreateShaderResourceView(_shadowMap.Get(), &srvDesc, handle);
+}
+
 void Dx12Wrapper::SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& target, float nearZ, float farZ)
 {
 	DirectX::XMFLOAT3 up(0, 1, 0);	// 上ベクトル
@@ -579,16 +590,42 @@ void Dx12Wrapper::SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT
 void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 {
 	auto lightDir = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&_lightVec));
-	auto target = DirectX::XMLoadFloat3(&center); 
+	const auto up = DirectX::XMVectorSet(0, 1, 0, 0);
+
+	// -- 注視点をテクセル境界に合わせる --
+	  // 光源カメラが中途半端な位置にあると、影の縁のドットが毎フレーム入れ替わってチラつく。
+	  // 光源から見た座標系で丸めてから戻すことで、格子が常に同じ場所に来るようにする
+	const float texelSize = _shadowArea / static_cast<float>(ShadowMapSize);
+
+	// いったん原点を光源から見た向きに変換するための行列（位置は関係ないので原点でよい）
+	auto lightRot = DirectX::XMMatrixLookAtLH(
+		DirectX::XMVectorZero(), lightDir, up);
+
+	auto centerV = DirectX::XMLoadFloat3(&center);
+	auto centerInLight = DirectX::XMVector3TransformCoord(centerV, lightRot);
+
+	// 光源から見た XY（画面に相当する 2 軸）だけを丸める。Z（奥行き）はそのまま
+	DirectX::XMFLOAT3 snapped;
+	DirectX::XMStoreFloat3(&snapped, centerInLight);
+	snapped.x = floorf(snapped.x / texelSize) * texelSize;
+	snapped.y = floorf(snapped.y / texelSize) * texelSize;
+
+	// ワールド座標へ戻す
+	auto invLightRot = DirectX::XMMatrixInverse(nullptr, lightRot);
+	auto target = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&snapped), invLightRot);
 	auto lightPos = DirectX::XMVectorSubtract(target,
 		DirectX::XMVectorScale(lightDir, _lightDistance));      // 光の手前へ引く(20 くらい)
 
-	auto lightView = DirectX::XMMatrixLookAtLH(lightPos, target, DirectX::XMVectorSet(0, 1, 0, 0));
-	auto lightProj = DirectX::XMMatrixOrthographicLH(
-		_shadowArea, _shadowArea, 1.0f, 100.0f);                 // ShadowArea = 30 くらい
+	auto lightView = DirectX::XMMatrixLookAtLH(lightPos, target, up);
+	constexpr float LightNear = 1.0f;
+	constexpr float LightFar = 100.0f;
+
+	auto lightProj = DirectX::XMMatrixOrthographicLH(_shadowArea, _shadowArea, LightNear, LightFar);
 
 	_mappedScene->lightCamera = lightView * lightProj;
 	_mappedScene->lightVec = _lightVec;
+	_mappedScene->shadowMapTexel = 1.0f / static_cast<float>(ShadowMapSize);
+	_mappedScene->lightRange = LightFar - LightNear;
 }
 
 void Dx12Wrapper::BeginShadowPass()
