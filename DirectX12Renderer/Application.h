@@ -21,6 +21,9 @@ class Ground;
 class Pera;
 class Stage;
 class DebugUI;
+class King;
+class EnemyPool;
+class Spawner;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -95,10 +98,13 @@ private:
 	std::unique_ptr<Dx12Wrapper> _dx12;
 	std::unique_ptr<DebugUI> _debugUI;
 	std::unique_ptr<GltfRenderer> _gltfRenderer;
-	std::unique_ptr<GltfModel> _gltfModel;
 	std::unique_ptr<Ground> _ground;
 	std::unique_ptr<Pera> _pera;
 	std::unique_ptr<Stage> _stage;
+
+	std::unique_ptr<GltfModel> _playerModel;
+	std::unique_ptr<GltfModel> _kingModel;
+	std::unique_ptr<GltfModel> _antModel;
 
 	// -- 書籍時代の PMD 描画（現在は使っていない） --
 	std::unique_ptr<PMDRenderer> _pmdRenderer;
@@ -108,11 +114,12 @@ private:
 	// 見た目(GltfActor) と 体(CharacterController) は、プレイヤーも敵も同じ配列で扱う。
 	// 描画・物理・当たり判定を、区別せずまとめてループで回せるようにするため
 	std::vector<std::unique_ptr<GltfActor>> _gltfActors;
-	std::vector<std::unique_ptr<CharacterController>> _controllers;
+	std::vector<std::unique_ptr<CharacterController>> _ownedControllers;   // プレイヤーと王
+	std::vector<CharacterController*> _allControllers;                     // 判定・更新に回す全員
 
 	// 判断を受け持つ部分。プレイヤーは 1 体だけ
 	std::unique_ptr<Player> _playerLogic;
-	std::vector<std::unique_ptr<Enemy>> _enemies;
+	std::unique_ptr<King> _king;
 
 	// 上の配列の先頭を指すだけ（所有しない）
 	GltfActor* _player = nullptr;
@@ -125,4 +132,9 @@ private:
 
 	GameState _gameState = GameState::Title;
 	float _gameStateTime = 0.0f;
+
+	std::unique_ptr<EnemyPool> _enemyPool;
+	std::vector<Spawner> _spawners;
+	float _survivedTime = 0.0f;   // 生存時間（スコア）
+	int _killCount = 0;           // 討伐数（スコア）
 };

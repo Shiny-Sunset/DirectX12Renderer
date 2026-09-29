@@ -471,3 +471,16 @@ bool GltfActor::PlayAnimation(const std::string& name, float blendSeconds)
 	std::cout << "PlayAnimation " << name << " is not found" << std::endl;
 	return false;
 }
+
+void GltfActor::StopAnimation()
+{
+	_currentAnimation = -1;
+	_prevAnimation = -1;
+	_animTime = 0.0f;
+	_prevAnimTime = 0.0f;
+	_blendRemain = 0.0f;
+
+	// バインドポーズへ戻す
+	_animNodes = _model.Nodes();
+	UpdateBoneMatrices();
+}

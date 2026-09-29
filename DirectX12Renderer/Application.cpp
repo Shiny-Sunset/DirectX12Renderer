@@ -13,7 +13,10 @@
 #include "CharacterController.h"
 #include "Enemy.h"
 #include "Player.h"
+#include "King.h"
 #include "Stage.h"
+#include "EnemyPool.h"
+#include "Spawner.h"
 #include <tchar.h>
 #include <iostream>
 #include <algorithm>
@@ -49,11 +52,14 @@ namespace
 	}
 	constexpr float TurnSpeed = 12.0f;   // 向きを合わせる速さ
 
-	constexpr DirectX::XMFLOAT3 SpawnPositions[] = {
-			  { -2.0f, 0.0f, 0.0f },   // [0] プレイヤー
-			  {  0.0f, 0.0f, 0.0f },   // [1] 敵
-			  {  2.0f, 0.0f, 0.0f },   // [2] 敵
-	};
+	const char* const PlayerModelPath = "Model/DangoGirl.glb";
+	const char* const KingModelPath = "Model/dangomushi.glb";
+	const char* const AntModelPath = "Model/Ant.glb";
+
+	constexpr DirectX::XMFLOAT3 PlayerSpawn = { -2.0f, 0.0f, 0.0f };
+
+	constexpr DirectX::XMFLOAT3 KingPosition = { 0.0f, 0.0f, 0.0f };
+	constexpr float KingScale = 2.0f;
 }
 
 Application& Application::Instance()
@@ -154,41 +160,50 @@ bool Application::Init()
 	*/
 
 	// -- モデルの読み込み（1 回だけ） --
-	_gltfModel = std::make_unique<GltfModel>(*_dx12);
-	if (!_gltfModel->Init(model_path)) return false;
+	_playerModel = std::make_unique<GltfModel>(*_dx12);
+	if (!_playerModel->Init(PlayerModelPath)) return false;
 
-	// -- アクターを 3 体作る --
-	for (int i = 0; i < 3; ++i)
-	{
-		auto actor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer, *_gltfModel);
-		if (!actor->Init()) return false;
-		actor->SetPosition(SpawnPositions[i]);
-		_gltfActors.push_back(std::move(actor));
+	_kingModel = std::make_unique<GltfModel>(*_dx12);
+	if (!_kingModel->Init(KingModelPath)) return false;
 
-		auto controller = std::make_unique<CharacterController>(*_gltfActors.back());
-		_controllers.push_back(std::move(controller));
+	_antModel = std::make_unique<GltfModel>(*_dx12);
+	if (!_antModel->Init(AntModelPath)) return false;
 
-		// 0 番はプレイヤーなので、1 番以降を敵にする
-		if (i != 0)
-		{
-			_enemies.push_back(std::make_unique<Enemy>(
-				*_gltfActors.back(), *_controllers.back()));
-		}
-	}
+	// -- プレイヤー --
+	auto playerActor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer, *_playerModel);
+	if (!playerActor->Init()) return false;
+	playerActor->SetPosition(PlayerSpawn);
+	_gltfActors.push_back(std::move(playerActor));
+
+	auto playerCtrl = std::make_unique<CharacterController>(*_gltfActors.back());
+	playerCtrl->SetPushWeight(5.0f);
+	_ownedControllers.push_back(std::move(playerCtrl));
+
 	_player = _gltfActors[0].get();
-
-	_playerController = _controllers[0].get();
-
+	_playerController = _ownedControllers[0].get();
 	_playerLogic = std::make_unique<Player>(*_player, *_playerController);
 
-	/*
-	_pmdActor = std::make_unique<PMDActor>(*_dx12);
-	if (!_pmdActor->Init(model_path)) return false;
-	if (!_pmdActor->LoadVMDFile(motion_path)) return false;
-	*/
+	// -- 王 --
+	auto kingActor = std::make_unique<GltfActor>(*_dx12, *_gltfRenderer, *_kingModel);
+	if (!kingActor->Init()) return false;
+	kingActor->SetPosition(KingPosition);
+	_gltfActors.push_back(std::move(kingActor));
 
-	//_pmdActor->PlayAnimation();
+	auto kingCtrl = std::make_unique<CharacterController>(*_gltfActors.back());
+	_ownedControllers.push_back(std::move(kingCtrl));
 
+	_king = std::make_unique<King>(*_gltfActors.back(), *_ownedControllers.back(), KingScale);
+
+	// -- 敵 --
+	_enemyPool = std::make_unique<EnemyPool>(*_dx12, *_gltfRenderer, *_antModel);
+	if (!_enemyPool->Init(30)) return false;
+
+	// 四隅の巣穴
+	constexpr float D = 12.0f;
+	_spawners.emplace_back(DirectX::XMFLOAT3{ -D, 0.0f, -D });
+	_spawners.emplace_back(DirectX::XMFLOAT3{ D, 0.0f, -D });
+	_spawners.emplace_back(DirectX::XMFLOAT3{ -D, 0.0f,  D });
+	_spawners.emplace_back(DirectX::XMFLOAT3{ D, 0.0f,  D });
 
 	DirectX::XMFLOAT3 eye(0.0f, 1.0f, -2.0f);	// 視点
 	DirectX::XMFLOAT3 target(0.0f, 0.9f, 0.0f);	// 注視点
@@ -202,6 +217,16 @@ bool Application::Init()
 	_playerController->SetPushWeight(5.0f);   // 敵 5 体ぶんの重さ
 
 	for (auto& actor : _gltfActors) actor->Update(0.0f);
+
+	_allControllers.clear();
+	for (const auto& c : _ownedControllers)
+	{
+		_allControllers.push_back(c.get());
+	}
+	for (const auto& c : _enemyPool->Controllers())
+	{
+		_allControllers.push_back(c.get());
+	}
 
 	return true;
 }
@@ -251,7 +276,7 @@ void Application::Run()
 			// 押しっぱなしで即スキップされないよう、少し待ってから受け付ける
 			if (_gameStateTime > 1.0f && uiFree && _input.IsTriggered('R'))
 			{
-				RestartGame();   // 段階 B で実装
+				RestartGame();
 			}
 			break;
 
@@ -262,27 +287,44 @@ void Application::Run()
 		// -- 更新処理 --
 		if (_gameState == GameState::Playing)
 		{
+			_survivedTime += dt;
 			_playerLogic->Update(dt, _input, _camera.Yaw(), !_debugUI->WantCaptureKeyboard());
-			for (auto& e : _enemies) e->Update(dt, _player->Position());	// 敵の判断
+			_king->Update(dt);
+			for (auto& s : _spawners) s.Update(dt, _survivedTime, *_enemyPool);   // 湧く
+			_enemyPool->Update(dt, _king->Position(), _king->BodySphere().radius);                            // 判断
 			CheckAttackHits();	// ヒット判定
 			// 床の高さを先に教えてから動かす
-			for (auto& c : _controllers)
+			for (auto& c : _allControllers)
 			{
 				const auto& p = c->Position();   // または既存の取得方法
 				c->SetGroundHeight(_stage->GroundHeightAt(p.x, p.z, p.y + 0.05f));
 			}
-			for (auto& c : _controllers) c->Update(dt);	// コリジョン更新
-			for (auto& c : _controllers) _stage->Resolve(*c);
+			for (auto& c : _allControllers) c->Update(dt);	// コリジョン更新
+			for (auto& c : _allControllers) _stage->Resolve(*c);
 			ResolveCollisions();	// 重なりの解消
-			// 敵の攻撃がプレイヤーに当たっているか
-			for (auto& e : _enemies)
+			// 敵の攻撃が王やプレイヤーに当たっているか
+			for (size_t i = 0; i < _enemyPool->Size(); ++i)
 			{
+				if (!_enemyPool->IsActive(i)) continue;
+
+				Enemy* e = _enemyPool->At(i);
 				if (!e->IsAttackActive()) continue;
-				if (!Intersects(e->AttackSphere(), _playerLogic->BodySphere())) continue;
-				_playerLogic->TakeDamage(1);
+
+				const Sphere atk = e->AttackSphere();
+
+				if (Intersects(atk, _king->BodySphere()))
+				{
+					_king->TakeDamage(1);
+					continue;
+				}
+				if (Intersects(atk, _playerLogic->BodySphere()))
+				{
+					_playerLogic->TakeDamage(1);
+				}
 			}
 
 			for (auto& actor : _gltfActors) actor->Update(dt);	// 実際に動かす
+			_enemyPool->UpdateActors(dt);
 			//_pmdActor->Update();
 
 			_dx12->UpdateLightCamera(_player->Position());
@@ -307,6 +349,7 @@ void Application::Run()
 		// -- 0 パス目：影 --
 		_dx12->BeginShadowPass();
 		for (auto& actor : _gltfActors) actor->DrawShadow();
+		_enemyPool->DrawShadow();
 		_stage->DrawShadow();
 		_dx12->EndShadowPass();
 		
@@ -318,6 +361,7 @@ void Application::Run()
 		_stage->Draw();
 		_gltfRenderer->BeforeDraw();
 		for (auto& actor : _gltfActors) actor->Draw();
+		_enemyPool->Draw();
 		_dx12->EndOffscreenPass();
 
 
@@ -334,14 +378,20 @@ void Application::Terminate()
 {
 	// COM / D3D12 オブジェクトの解放を main() の中で終わらせておく
 	// (宣言順の逆に破棄されるが、依存関係が分かるように明示的に並べる)
+	_allControllers.clear();
+	_enemyPool.reset();
+	_king.reset();
+	_playerLogic.reset();
+	_player = nullptr;
+	_playerController = nullptr;
+	_gltfActors.clear();
+	_ownedControllers.clear();
 	_debugUI.reset();
 	_pmdActor.reset();
 	_pmdRenderer.reset();
-	_playerController = nullptr;
-	_controllers.clear();
-	_player = nullptr;         // 所有しないポインタを先に無効化
-	_gltfActors.clear();       // 中の unique_ptr をすべて解放
-	_gltfModel.reset();        // アクターが参照し終わってから解放
+	_playerModel.reset();
+	_kingModel.reset();        // アクターが参照し終わってから解放
+	_antModel.reset();
 	_gltfRenderer.reset();
 	_ground.reset();
 	_stage.reset();
@@ -491,31 +541,34 @@ void Application::BuildDebugUI()
 	float radius = _playerController->Radius();
 	if (ImGui::SliderFloat("Radius", &radius, 0.1f, 1.5f))
 	{
-		for (auto& c : _controllers) c->SetRadius(radius);
+		for (auto& c : _ownedControllers) c->SetRadius(radius);
 	}
 
 	// プレイヤーと 2 体目の距離
-	if (_controllers.size() > 1)
+	if (_ownedControllers.size() > 1)
 	{
-		const auto pa = _controllers[0]->BodySphere().center;
-		const auto pb = _controllers[1]->BodySphere().center;
+		const auto pa = _ownedControllers[0]->BodySphere().center;
+		const auto pb = _ownedControllers[1]->BodySphere().center;
 		const float dx = pa.x - pb.x, dz = pa.z - pb.z;
 		ImGui::Text("Dist to #1: %.2f (sum r = %.2f)",
 			sqrtf(dx * dx + dz * dz),
-			_controllers[0]->Radius() + _controllers[1]->Radius());
+			_ownedControllers[0]->Radius() + _ownedControllers[1]->Radius());
 	}
 
 	ImGui::Separator();
 	ImGui::Text("Enemies");
-	for (size_t i = 0; i < _enemies.size(); ++i)
-	{
-		ImGui::Text("#%zu: %s", i, _enemies[i]->StateName());
-	}
+	ImGui::Text("Alive: %d / %zu", _enemyPool->AliveCount(), _enemyPool->Size());
+	ImGui::Text("Kills: %d", _killCount);
+	ImGui::Text("Time:  %.1f s", _survivedTime);
 
-	ImGui::Text("Player: %s  HP %d", _playerLogic->StateName(), _playerLogic->HP());
-	for (size_t i = 0; i < _enemies.size(); ++i)
+	ImGui::Separator();
+	ImGui::Text("King");
+	ImGui::Text("HP  %d / %d", _king->HP(), _king->MaxHP());
+
+	float kingScale = _king->Scale();
+	if (ImGui::SliderFloat("King Scale", &kingScale, 0.5f, 5.0f))
 	{
-		ImGui::Text("#%zu: %-8s HP %d", i, _enemies[i]->StateName(), _enemies[i]->HP());
+		_king->SetScale(kingScale);
 	}
 	ImGui::NewLine();
 
@@ -537,8 +590,10 @@ void Application::BuildGameUI()
 			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 			ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs);
 
-		ImGui::Text("HP  %d", _playerLogic->HP());
-		ImGui::Text("Enemy  %d", AliveEnemyCount());
+		ImGui::Text("KING  %d / %d", _king->HP(), _king->MaxHP());
+		ImGui::Text("HP    %d", _playerLogic->HP());
+		ImGui::Text("TIME  %.1f", _survivedTime);
+		ImGui::Text("KILL  %d", _killCount);
 
 		ImGui::End();
 		return;
@@ -576,27 +631,25 @@ void Application::ResolveCollisions()
 	for (int iter = 0; iter < Iterations; ++iter)
 	{
 		// 総当たりで調べる
-		for (size_t i = 0; i < _controllers.size(); ++i)
+		for (size_t i = 0; i < _allControllers.size(); ++i)
 		{
-			for (size_t j = i + 1; j < _controllers.size(); ++j)
+			for (size_t j = i + 1; j < _allControllers.size(); ++j)
 			{
-				auto& a = *_controllers[i];
-				auto& b = *_controllers[j];
+				auto& a = *_allControllers[i];
+				auto& b = *_allControllers[j];
+
+				// 死んだキャラクターなどは判定しない
+				if (!a.IsCollisionEnabled() || !b.IsCollisionEnabled()) continue;
 
 				float pushX = 0.0f, pushZ = 0.0f;
 				if (!ResolveXZ(a.BodySphere(), b.BodySphere(), pushX, pushZ)) continue;
 
-				const float wa = a.PushWeight();
-				const float wb = b.PushWeight();
-				const float total = wa + wb;
-				if (total <= 0.0f) continue;   // 両方とも不動なら何もしない
+				const float total = a.PushWeight() + b.PushWeight();
+				if (total <= 0.0f) continue;   // 念のため（通常は起きない）
 
-				// 重い方が動かない。b が重いほど a がたくさん動く
-				const float ratioA = wb / total;
-				const float ratioB = wa / total;
-
-				a.PushXZ(pushX * ratioA, pushZ * ratioA);
-				b.PushXZ(-pushX * ratioB, -pushZ * ratioB);
+				// 重い方が動かない。相手が重いほど、自分がたくさん動く
+				a.PushXZ(pushX * (b.PushWeight() / total), pushZ * (b.PushWeight() / total));
+				b.PushXZ(-pushX * (a.PushWeight() / total), -pushZ * (a.PushWeight() / total));
 			}
 		}
 	}
@@ -609,33 +662,30 @@ void Application::CheckAttackHits()
 	const Sphere atk = _playerLogic->AttackSphere();
 	const auto& pp = _player->Position();
 
-	for (auto& e : _enemies)
+	for (size_t i = 0; i < _enemyPool->Size(); ++i)
 	{
+		if (!_enemyPool->IsActive(i)) continue;
+
+		Enemy* e = _enemyPool->At(i);
 		if (e->IsDead()) continue;
 		if (!Intersects(atk, e->BodySphere())) continue;
 
+		const int hpBefore = e->HP();
 		e->TakeDamage(1, _playerLogic->AttackId(), pp.x, pp.z);
+
+		if (hpBefore > 0 && e->IsDead())
+		{
+			++_killCount;
+		}
 	}
 }
 
 void Application::CheckGameEnd()
 {
 	// プレイヤーが死んだ
-	if (_playerLogic->CurrentState() == Player::State::Dead)
+	if (_playerLogic->CurrentState() == Player::State::Dead || _king->IsDestroyed())
 	{
 		ChangeGameState(GameState::GameOver);
-		return;
-	}
-
-	// 敵が全滅した
-	bool allDead = true;
-	for (const auto& e : _enemies)
-	{
-		if (!e->IsDead()) { allDead = false; break; }
-	}
-	if (allDead)
-	{
-		ChangeGameState(GameState::Clear);
 	}
 }
 
@@ -649,13 +699,14 @@ void Application::ChangeGameState(GameState next)
 void Application::RestartGame()
 {
 	// 初期位置は Init と同じ式を使う（2 か所に散らばらないよう定数化しておくとなお良い）
-	_playerLogic->Reset(SpawnPositions[0]);
+	_playerLogic->Reset(PlayerSpawn);
+	_king->Reset();
 
-	for (size_t i = 0; i < _enemies.size(); ++i)
-	{
-		_enemies[i]->Reset(SpawnPositions[i + 1]);   // 敵は [1] から
-	}
+	_enemyPool->ResetAll(); 
+	for (auto& s : _spawners) s.Reset();
 
+	_survivedTime = 0.0f;
+	_killCount = 0;
 	for (auto& actor : _gltfActors) actor->Update(0.0f);
 
 	ChangeGameState(GameState::Playing);
@@ -663,10 +714,5 @@ void Application::RestartGame()
 
 int Application::AliveEnemyCount()
 {
-	int cnt = 0;
-	for (const auto& e : _enemies)
-	{
-		if (!e->IsDead()) ++cnt;
-	}
-	return cnt;
+	return _enemyPool->AliveCount();
 }

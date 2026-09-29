@@ -13,50 +13,53 @@ Enemy::Enemy(GltfActor& actor, CharacterController& controller)
     _actor.PlayAnimation("Idle", 0.0f);
 }
 
-void Enemy::Update(float deltaTime, const DirectX::XMFLOAT3& playerPos)
+void Enemy::Update(float deltaTime, const DirectX::XMFLOAT3& targetPos, float targetRadius)
 {
     _stateTime += deltaTime;
     _cooldown = std::max(0.0f, _cooldown - deltaTime);
 
     // -- プレイヤーまでの距離（水平方向のみ） --
     const auto& myPos = _actor.Position();
-    const float dx = playerPos.x - myPos.x;
-    const float dz = playerPos.z - myPos.z;
+    const float dx = targetPos.x - myPos.x;
+    const float dz = targetPos.z - myPos.z;
     const float dist = sqrtf(dx * dx + dz * dz);
+    // 相手の表面までの距離。自分の半径も引いて「隙間」を測る
+    const float gap = dist - targetRadius - _controller.Radius();
 
     switch (_state)
     {
     case State::Idle:
         _controller.SetMoveVelocity(0.0f, 0.0f);
-        if (dist < DetectRange)
-        {
-            ChangeState(State::Chase);
-        }
+        //if (dist < DetectRange)
+        //{
+        //    ChangeState(State::Chase);
+        //}
+        ChangeState(State::Chase);
         break;
 
     case State::Chase:
-        if (dist > LoseRange)
-        {
-            ChangeState(State::Idle);
-            break;
-        }
+        //if (dist > LoseRange)
+        //{
+        //    ChangeState(State::Idle);
+        //    break;
+        //}
 
         // -- 距離に関係なく、常にプレイヤーの方を向く --
         // dist が 0 に近いと方向が定まらないので、そのときは向きを変えない
-        if (dist > 1e-4f)
+        if (gap > 1e-4f)
         {
             FaceTowards(dx / dist, dz / dist, deltaTime);
         }
 
         // -- 近すぎなければ前進する --
-        if (dist > StopDistance)
+        if (gap > StopDistance)
         {
             _controller.SetMoveVelocity(dx / dist * ChaseSpeed, dz / dist * ChaseSpeed);
         }
         else
         {
             _controller.SetMoveVelocity(0.0f, 0.0f);
-            if (dist < AttackRange && _cooldown <= 0.0f)
+            if (gap < AttackRange && _cooldown <= 0.0f)
             {
                 ChangeState(State::Attack);
             }
@@ -174,7 +177,7 @@ void Enemy::ChangeState(State next)
     // 死んだら当たり判定から外れる（見えない壁として残らないように）
     if (_state == State::Dead)
     {
-        _controller.SetPushWeight(0.0f);
+        _controller.SetCollisionEnabled(false);
     }
 
     // 状態に応じたアニメーションは、ここだけで切り替える
@@ -182,9 +185,9 @@ void Enemy::ChangeState(State next)
     {
     case State::Idle:    _actor.PlayAnimation("Idle"); break;
     case State::Chase:   _actor.PlayAnimation("Walk"); break;
-    case State::Attack:  _actor.PlayAnimation("Curl_up1", 0.05f); break;
-    case State::Damaged: _actor.PlayAnimation("Curl_up1", 0.05f); break;
-    case State::Dead:    _actor.PlayAnimation("Curl_up_loop", 0.2f); break;
+    case State::Attack:  _actor.PlayAnimation("Attack", 0.05f); break;
+    case State::Damaged: _actor.PlayAnimation("Attack", 0.05f); break;   // 専用が無いので流用
+    case State::Dead:    _actor.PlayAnimation("Idle", 0.2f); break;
     }
 }
 

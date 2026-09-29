@@ -24,8 +24,9 @@ public:
     Enemy(GltfActor& actor, CharacterController& controller);
 
     // -- 毎フレームの更新 --
-    // @param playerPos プレイヤーの位置（追跡の目標）
-    void Update(float deltaTime, const DirectX::XMFLOAT3& playerPos);
+    // @param targetPos 目標の位置
+    // @param targetRadius 目標の当たり判定の半径（表面からの距離を測るのに使う）
+    void Update(float deltaTime, const DirectX::XMFLOAT3& targetPos, float targetRadius);
 
     // -- 外からの働きかけ --
     // ダメージを受ける
@@ -60,12 +61,12 @@ private:
     static constexpr float DetectRange = 5.0f;    // この距離まで近づくと気づく
     static constexpr float LoseRange = 8.0f;      // この距離まで離れると見失う
                                                   // (気づく距離と変えて、境目でのばたつきを防ぐ)
-    static constexpr float StopDistance = 1.0f;   // これ以上は近づかない
+    static constexpr float StopDistance = 0.4f;   // これ以上は近づかない
     static constexpr float ChaseSpeed = 2.0f;     // 追跡する速さ（m/秒）
     static constexpr float TurnSpeed = 8.0f;      // 向きを変える速さ
 
     // -- 定数：戦闘 --
-    static constexpr float AttackRange = 1.2f;      // この距離で攻撃を始める
+    static constexpr float AttackRange = 0.6f;      // この距離で攻撃を始める
     static constexpr float AttackDuration = 0.8f;   // 攻撃全体の長さ
     static constexpr float AttackHitTime = 0.3f;    // 攻撃判定が出る時刻
     static constexpr float AttackCooldown = 1.5f;   // 次に攻撃できるまでの間隔

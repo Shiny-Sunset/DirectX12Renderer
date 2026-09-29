@@ -167,7 +167,7 @@ private:
 	};
 
 	// シャドウマップの解像度
-	static constexpr UINT ShadowMapSize = 4096;
+	static constexpr UINT ShadowMapSize = 2048;
 
 	// -- 初期化のサブルーチン（Init から順に呼ばれる） --
 	bool InitializeDXGIDevice();

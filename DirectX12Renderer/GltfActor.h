@@ -42,6 +42,9 @@ public:
     // @return 見つかったら true
     bool PlayAnimation(const std::string& name, float blendSeconds = 0.2f);
 
+    // アニメーションを止めて、バインドポーズに戻す
+    void StopAnimation();
+
     const char* CurrentAnimationName() const
     {
         return _currentAnimation < 0 ? "(none)" : _model.Animations()[_currentAnimation].name.c_str();

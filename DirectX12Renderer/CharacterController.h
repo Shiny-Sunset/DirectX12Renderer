@@ -12,6 +12,8 @@ class CharacterController
 public:
     explicit CharacterController(GltfActor& actor);
 
+    static constexpr float Immovable = 1.0e6f;
+
     // -- 毎フレームの更新 --
     // 重力を適用し、速度に従って位置を進める
     void Update(float deltaTime);
@@ -48,6 +50,7 @@ public:
         _velocity = { 0.0f, 0.0f, 0.0f };
         _grounded = true;
         _pushWeight = 1.0f;   // 死亡時に 0 にしているので戻す
+        _collisionEnabled = true;
     }
 
     // -- 調整値 --
@@ -62,6 +65,10 @@ public:
     // （1.0 = 普通、10.0 = ほぼ動かない、0 = 完全に固定）
     void SetPushWeight(float w) { _pushWeight = w; }
     float PushWeight() const { return _pushWeight; }
+
+    // 当たり判定に参加するか（死亡したキャラクターなどを除外する）
+    void SetCollisionEnabled(bool enabled) { _collisionEnabled = enabled; }
+    bool IsCollisionEnabled() const { return _collisionEnabled; }
 
     // 今いる場所の床の高さ（毎フレーム、ステージから教えてもらう）
     void SetGroundHeight(float y) { _groundHeight = y; }
@@ -78,6 +85,7 @@ private:
     // -- 状態 --
     DirectX::XMFLOAT3 _velocity = { 0.0f, 0.0f, 0.0f };
     bool _grounded = true;
+    bool _collisionEnabled = true;
 
     // -- 調整値 --
     float _gravity = -20.0f;     // m/秒²（下向きなので負）
