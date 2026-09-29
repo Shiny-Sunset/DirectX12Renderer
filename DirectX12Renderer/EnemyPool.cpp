@@ -32,7 +32,7 @@ bool EnemyPool::Init(size_t count)
     return true;
 }
 
-bool EnemyPool::Spawn(const DirectX::XMFLOAT3& pos)
+bool EnemyPool::Spawn(const DirectX::XMFLOAT3& pos, float speedScale)
 {
     for (size_t i = 0; i < _active.size(); ++i)
     {
@@ -40,6 +40,7 @@ bool EnemyPool::Spawn(const DirectX::XMFLOAT3& pos)
 
         _active[i] = true;
         _enemies[i]->Reset(pos);              // HP・状態・位置を初期化
+        _enemies[i]->SetChaseSpeed(GameConfig::Enemy::ChaseSpeed * speedScale);
         _actors[i]->SetVisible(true);
         _controllers[i]->SetCollisionEnabled(true);
         _actors[i]->Update(0.0f);

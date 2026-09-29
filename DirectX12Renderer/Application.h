@@ -7,6 +7,7 @@
 #include "GameTimer.h"
 #include "Input.h"
 #include "Camera.h"
+#include "GameConfig.h"
 
 class Dx12Wrapper;
 class PMDRenderer;
@@ -84,6 +85,14 @@ private:
 
 	int AliveEnemyCount();
 
+	int PointPerSecond = GameConfig::Score::PointPerSecond;
+	int PointPerKill = GameConfig::Score::PointPerKill;
+	// 生存時間 1 秒 = 10 点、討伐 1 匹 = 50 点
+	int CalcScore() const
+	{
+		return static_cast<int>(_survivedTime * PointPerSecond) + _killCount * PointPerKill;
+	}
+
 	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
 	void BuildDebugUI();
 
@@ -137,4 +146,7 @@ private:
 	std::vector<Spawner> _spawners;
 	float _survivedTime = 0.0f;   // 生存時間（スコア）
 	int _killCount = 0;           // 討伐数（スコア）
+	int _highScore = 0;
+
+	GameConfig::Tuning _tuning;
 };

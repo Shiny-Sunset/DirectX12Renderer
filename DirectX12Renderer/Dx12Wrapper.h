@@ -226,7 +226,7 @@ private:
 	// -- 平行光源 --
 	DirectX::XMFLOAT3 _lightVec = { 1.0f, -1.0f, 1.0f };   // 光が進む向き（斜め上から）
 	float _lightDistance = 20.0f;   // 注視点から光源を引く距離
-	float _shadowArea = 15.0f;      // 影を落とす範囲（m 四方）
+	float _shadowArea = 25.0f;      // 影を落とす範囲（m 四方）
 
 	// -- テクスチャ --
 	ComPtr<ID3D12Resource> _whiteTex;

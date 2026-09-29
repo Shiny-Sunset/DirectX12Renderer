@@ -290,7 +290,7 @@ void Application::Run()
 			_survivedTime += dt;
 			_playerLogic->Update(dt, _input, _camera.Yaw(), !_debugUI->WantCaptureKeyboard());
 			_king->Update(dt);
-			for (auto& s : _spawners) s.Update(dt, _survivedTime, *_enemyPool);   // 湧く
+			for (auto& s : _spawners) s.Update(dt, _survivedTime, *_enemyPool, _tuning);   // 湧く
 			_enemyPool->Update(dt, _king->Position(), _king->BodySphere().radius);                            // 判断
 			CheckAttackHits();	// ヒット判定
 			// 床の高さを先に教えてから動かす
@@ -302,6 +302,8 @@ void Application::Run()
 			for (auto& c : _allControllers) c->Update(dt);	// コリジョン更新
 			for (auto& c : _allControllers) _stage->Resolve(*c);
 			ResolveCollisions();	// 重なりの解消
+			for (auto& c : _allControllers) _stage->Resolve(*c);
+			for (auto& c : _allControllers) _stage->Unstuck(*c);
 			// 敵の攻撃が王やプレイヤーに当たっているか
 			for (size_t i = 0; i < _enemyPool->Size(); ++i)
 			{
@@ -336,6 +338,21 @@ void Application::Run()
 			_dx12->SetCamera(_camera.Eye(), _camera.Focus(), 0.1f, 100.0f);
 
 			CheckGameEnd();
+		}
+		else
+		{
+			// タイトル・結果画面では、王の周りをゆっくり回す
+			constexpr float Radius = 14.0f;
+			constexpr float Height = 7.0f;
+			constexpr float Speed = 0.15f;   // ラジアン/秒
+
+			const float angle = _gameStateTime * Speed;
+			const DirectX::XMFLOAT3 eye = {
+					sinf(angle) * Radius, Height, cosf(angle) * Radius };
+			const DirectX::XMFLOAT3 target = { 0.0f, 1.5f, 0.0f };
+			_dx12->UpdateLightCamera(_player->Position());
+
+			_dx12->SetCamera(eye, target, 0.1f, 100.0f);
 		}
 		
 
@@ -430,6 +447,16 @@ void Application::BuildDebugUI()
 	{
 		_dx12->SetVSyncEnabled(vsync);
 	}
+
+	ImGui::Separator();
+	ImGui::Text("Balance");
+	ImGui::SliderFloat("Spawn Interval", &_tuning.spawnIntervalScale, 0.2f, 3.0f);   // 全体の倍率
+	ImGui::SliderFloat("Ant Speed", &_tuning.antSpeedScale, 0.3f, 2.0f);
+	if (ImGui::SliderInt("King HP", &_tuning.kingMaxHP, 5, 50))
+	{
+		_king->SetMaxHP(_tuning.kingMaxHP);
+	}
+	ImGui::Text("(King HP is applied on restart)");
 
 	ImGui::Separator();
 	ImGui::Text("Light");
@@ -598,29 +625,57 @@ void Application::BuildGameUI()
 		ImGui::End();
 		return;
 	}
-
-	// -- タイトル・結果表示（中央） --
-	const char* title = "";
-	const char* guide = "";
-	switch (_gameState)
-	{
-	case GameState::Title:    title = "DANGO GIRL";  guide = "Space  -  Start"; break;
-	case GameState::Clear:    title = "CLEAR!";      guide = "R  -  Retry";     break;
-	case GameState::GameOver: title = "GAME OVER";   guide = "R  -  Retry";     break;
-	default: break;
-	}
-
+	// -- 中央のメッセージ --
 	ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
-		ImGuiCond_Always, ImVec2(0.5f, 0.5f));   // 第 3 引数で「窓の中心」を基準にする
+		ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 	ImGui::Begin("Message", nullptr,
 		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
 		ImGuiWindowFlags_NoBackground);
+	if (_gameState == GameState::Title)
+	{
+		ImGui::SetWindowFontScale(3.0f);
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "DANGO DEFENSE");
 
-	ImGui::SetWindowFontScale(3.0f);
-	ImGui::Text("%s", title);
-	ImGui::SetWindowFontScale(1.5f);
-	ImGui::Text("%s", guide);
+		ImGui::SetWindowFontScale(1.2f);
+		ImGui::Text(" ");
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "Protect the King from the ants!");
+		ImGui::Text(" ");
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "WASD    Move        Shift  Run");
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "Space   Jump        Click  Attack");
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "Mouse Right Drag    Camera");
+		ImGui::Text(" ");
+
+		ImGui::SetWindowFontScale(1.5f);
+		ImGui::Text("Press SPACE to start");
+	}
+	else   // Clear / GameOver
+	{
+		ImGui::SetWindowFontScale(3.0f);
+		ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "GAME OVER");
+
+		ImGui::SetWindowFontScale(1.5f);
+		ImGui::Text(" ");
+		ImGui::Text("TIME     %6.1f s   x%d", _survivedTime, PointPerSecond);
+		ImGui::Text("KILLS    %6d      x%d", _killCount, PointPerKill);
+		ImGui::Separator();
+
+		ImGui::SetWindowFontScale(2.0f);
+		ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.3f, 1.0f), "SCORE    %6d", CalcScore());
+
+		ImGui::SetWindowFontScale(1.2f);
+		if (CalcScore() >= _highScore && _highScore > 0)
+		{
+			ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "NEW RECORD!");
+		}
+		else
+		{
+			ImGui::Text("BEST     %6d", _highScore);
+		}
+
+		ImGui::Text(" ");
+		ImGui::Text("Press R to retry");
+	}
 
 	ImGui::End();
 }
@@ -682,10 +737,11 @@ void Application::CheckAttackHits()
 
 void Application::CheckGameEnd()
 {
-	// プレイヤーが死んだ
+	// プレイヤーが死んだ または 王が死んだ時
 	if (_playerLogic->CurrentState() == Player::State::Dead || _king->IsDestroyed())
 	{
 		ChangeGameState(GameState::GameOver);
+		_highScore = std::max(_highScore, CalcScore());
 	}
 }
 

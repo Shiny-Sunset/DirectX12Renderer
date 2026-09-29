@@ -21,6 +21,10 @@ public:
     // キャラクターをステージと衝突させて押し戻す
     void Resolve(CharacterController& controller) const;
 
+    // 箱にめり込んでいたら、最も近い面から押し出す
+    // すり抜けや、他のキャラクターに押し込まれた場合の保険
+    void Unstuck(CharacterController& controller) const;
+
     // 指定した位置の真下にある足場の高さを返す
     // @param x, z 調べる水平位置（キャラクターの足元）
     // @param maxY この高さ以下の足場だけを対象にする（頭上の足場を拾わないため）

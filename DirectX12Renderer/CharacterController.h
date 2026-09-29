@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <DirectXMath.h>
 #include "Collision.h"
+#include "GameConfig.h"
 
 class GltfActor;
 
@@ -79,6 +80,8 @@ public:
     float VelocityZ() const { return _velocity.z; }
 
 private:
+    static constexpr float MaxFallSpeed = -15.0f;   // 落下速度の上限（m/秒）
+
     // -- 参照するもの（所有しない） --
     GltfActor& _actor;
 
@@ -89,7 +92,7 @@ private:
 
     // -- 調整値 --
     float _gravity = -20.0f;     // m/秒²（下向きなので負）
-    float _jumpHeight = 1.2f;    // ジャンプの最高到達点（m）
+    float _jumpHeight = GameConfig::Player::JumpHeight;    // ジャンプの最高到達点（m）
     float _radius = 0.4f;        // 当たり判定の球の半径（m）
     float _pushWeight = 1.0f;    // 押し戻しの負担割合
     float _groundHeight = 0.0f; // 地面の高さ

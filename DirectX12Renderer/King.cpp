@@ -33,7 +33,7 @@ void King::TakeDamage(int amount)
 
 void King::Reset()
 {
-    _hp = MaxHitPoint;
+    _hp = _maxHP;
     _damagedTime = 0.0f;
     _actor.SetVisible(true);
     _actor.StopAnimation();

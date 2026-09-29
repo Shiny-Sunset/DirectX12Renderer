@@ -9,12 +9,33 @@ Stage::Stage(Dx12Wrapper& dx12, GltfRenderer& renderer) : _dx12(dx12), _renderer
 {
 }
 
+namespace
+{
+    constexpr float Half = 16.0f;   // 壁の外側まで
+    constexpr float Inner = 15.0f;  // 壁の内側
+    constexpr float WallH = 2.0f;   // 壁の高さ
+}
+
 bool Stage::Init()
 {
     _boxes = {
-              {{ { -6.0f, 0.0f, 2.0f }, { -2.0f, 0.5f, 6.0f } }},   // 低い段
-              {{ { -2.0f, 0.0f, 2.0f }, {  2.0f, 1.0f, 6.0f } }},   // 中くらいの段
-              {{ {  2.0f, 0.0f, 2.0f }, {  6.0f, 1.8f, 6.0f } }},   // 高い段
+        // -- 外周の壁（4 枚） --
+        {{ { -Half, 0.0f,  Inner }, {  Half, WallH,  Half  } }},   // 北
+        {{ { -Half, 0.0f, -Half  }, {  Half, WallH, -Inner } }},   // 南
+        {{ {  Inner, 0.0f, -Half }, {  Half, WallH,  Half  } }},   // 東
+        {{ { -Half, 0.0f, -Half  }, { -Inner, WallH, Half  } }},   // 西
+
+        // -- 内側の障害物（軸方向に配置して、対角の通り道を空ける） --
+        {{ { -7.0f, 0.0f, -1.5f }, { -5.0f, 1.2f,  1.5f } }},   // 西
+        {{ {  5.0f, 0.0f, -1.5f }, {  7.0f, 1.2f,  1.5f } }},   // 東
+        {{ { -1.5f, 0.0f,  5.0f }, {  1.5f, 1.2f,  7.0f } }},   // 北
+        {{ { -1.5f, 0.0f, -7.0f }, {  1.5f, 1.2f, -5.0f } }},   // 南
+
+        // -- 足場になる低い箱（ジャンプで乗れる高さ） --
+        {{ { -4.0f, 0.0f, -4.0f }, { -3.0f, 0.5f, -3.0f } }},
+        {{ {  3.0f, 0.0f,  3.0f }, {  4.0f, 0.5f,  4.0f } }},
+        {{ { -4.0f, 0.0f,  3.0f }, { -3.0f, 0.9f,  4.0f } }},
+        {{ {  3.0f, 0.0f, -4.0f }, {  4.0f, 0.9f, -3.0f } }},
     };
 
     if (!CompileShaders()) return false;
@@ -432,4 +453,46 @@ DirectX::XMMATRIX Stage::BoxWorldMatrix(const AABB& b) const
             (b.min.y + b.max.y) * 0.5f,
             (b.min.z + b.max.z) * 0.5f);
     return world;
+}
+
+void Stage::Unstuck(CharacterController& controller) const
+{
+    const auto& pos = controller.Position();
+    const float height = controller.Radius() * 2.0f;   // 体の高さ
+
+    for (const auto& box : _boxes)
+    {
+        const auto& b = box.bounds;
+
+        // 体の中心が箱の内部にあるか（水平）
+        if (pos.x < b.min.x || pos.x > b.max.x) continue;
+        if (pos.z < b.min.z || pos.z > b.max.z) continue;
+
+        // 高さ方向にも入り込んでいるか
+        if (pos.y >= b.max.y) continue;              // 箱の上に立っている
+        if (pos.y + height <= b.min.y) continue;     // 箱より下にいる
+
+        // -- めり込んでいる。一番近い面へ出す --
+        const float toTop = b.max.y - pos.y;                  // 上面へ
+        const float toMinX = pos.x - b.min.x + controller.Radius();
+        const float toMaxX = b.max.x - pos.x + controller.Radius();
+        const float toMinZ = pos.z - b.min.z + controller.Radius();
+        const float toMaxZ = b.max.z - pos.z + controller.Radius();
+
+        float best = toTop;
+        int face = 0;   // 0:上 1:-X 2:+X 3:-Z 4:+Z
+        if (toMinX < best) { best = toMinX; face = 1; }
+        if (toMaxX < best) { best = toMaxX; face = 2; }
+        if (toMinZ < best) { best = toMinZ; face = 3; }
+        if (toMaxZ < best) { best = toMaxZ; face = 4; }
+
+        switch (face)
+        {
+        case 0: controller.LandOn(b.max.y); break;              // 上面に乗せる
+        case 1: controller.PushXZ(-toMinX, 0.0f); break;
+        case 2: controller.PushXZ(toMaxX, 0.0f); break;
+        case 3: controller.PushXZ(0.0f, -toMinZ); break;
+        case 4: controller.PushXZ(0.0f, toMaxZ); break;
+        }
+    }
 }

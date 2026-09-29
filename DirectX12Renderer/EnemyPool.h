@@ -23,7 +23,7 @@ public:
 
     // 未使用の 1 体を指定位置に出す
     // @return 空きが無ければ false
-    bool Spawn(const DirectX::XMFLOAT3& pos);
+    bool Spawn(const DirectX::XMFLOAT3& pos, float speedScale);
 
     // @param targetPos 敵が目指す位置（王）
     // @param targetRadius 目標の当たり判定の半径

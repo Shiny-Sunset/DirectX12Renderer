@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <DirectXMath.h>
 #include "Collision.h"
+#include "GameConfig.h"
 
 class GltfActor;
 class CharacterController;
@@ -64,12 +65,12 @@ private:
     void FaceTowards(float dirX, float dirZ, float deltaTime);
 
     // -- 定数 --
-    static constexpr float TurnSpeed = 12.0f;       // 向きを変える速さ
-    static constexpr float AttackDuration = 0.5f;   // 攻撃全体の長さ
-    static constexpr float HitStart = 0.15f;        // 攻撃判定が出る時刻
-    static constexpr float HitEnd = 0.30f;          // 攻撃判定が消える時刻
-    static constexpr float DamagedTime = 0.4f;      // のけぞっている時間
-    static constexpr float InvincibleTime = 1.0f;   // 被弾後の無敵時間
+    float TurnSpeed = GameConfig::Player::TurnSpeed;       // 向きを変える速さ
+    float AttackDuration = GameConfig::Player::AttackDuration;   // 攻撃全体の長さ
+    float HitStart = GameConfig::Player::HitStart;        // 攻撃判定が出る時刻
+    float HitEnd = GameConfig::Player::HitEnd;          // 攻撃判定が消える時刻
+    float DamagedTime = GameConfig::Player::DamagedTime;      // のけぞっている時間
+    float InvincibleTime = GameConfig::Player::InvincibleTime;   // 被弾後の無敵時間
 
     // -- 参照するもの（所有しない） --
     GltfActor& _actor;
@@ -78,11 +79,11 @@ private:
     // -- 状態 --
     State _state = State::Move;
     float _stateTime = 0.0f;        // 今の状態になってからの経過秒数
-    int _hp = 3;
+    int _hp = GameConfig::Player::MaxHP;
     float _invincibleTime = 0.0f;   // 残りの無敵時間
     unsigned int _attackId = 1;     // 攻撃を出すたびに増える
 
     // -- 調整値 --
-    float _walkSpeed = 1.8f;   // m/秒
-    float _runSpeed = 4.0f;
+    float _walkSpeed = GameConfig::Player::WalkSpeed;   // m/秒
+    float _runSpeed = GameConfig::Player::RunSpeed;
 };

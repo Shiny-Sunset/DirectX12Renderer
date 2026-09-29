@@ -46,7 +46,7 @@ void Enemy::Update(float deltaTime, const DirectX::XMFLOAT3& targetPos, float ta
 
         // -- 距離に関係なく、常にプレイヤーの方を向く --
         // dist が 0 に近いと方向が定まらないので、そのときは向きを変えない
-        if (gap > 1e-4f)
+        if (dist > 1e-4f)
         {
             FaceTowards(dx / dist, dz / dist, deltaTime);
         }
@@ -54,7 +54,42 @@ void Enemy::Update(float deltaTime, const DirectX::XMFLOAT3& targetPos, float ta
         // -- 近すぎなければ前進する --
         if (gap > StopDistance)
         {
-            _controller.SetMoveVelocity(dx / dist * ChaseSpeed, dz / dist * ChaseSpeed);
+            // 王へ向かう方向
+            float vx = dx / dist;
+            float vz = dz / dist;
+
+            // -- 詰まりの検知 --
+            // 実際に動けた距離が、予定の 3 割に満たなければ壁にぶつかっている
+            const auto& pos = _actor.Position();
+            const float movedX = pos.x - _prevPos.x;
+            const float movedZ = pos.z - _prevPos.z;
+            const float moved = sqrtf(movedX * movedX + movedZ * movedZ);
+            const float expected = ChaseSpeed() * deltaTime;
+
+            if (_avoidTimer <= 0.0f && expected > 1e-5f && moved < expected * StuckThreshold)
+            {
+                _avoidTimer = AvoidTime;
+                _avoidSide = (rand() % 2 == 0) ? 1.0f : -1.0f;   // 左右どちらへ逸れるかは運任せ
+            }
+            _prevPos = pos;
+
+            // -- 回避中は横向きの成分を混ぜる --
+            if (_avoidTimer > 0.0f)
+            {
+                _avoidTimer -= deltaTime;
+
+                // 進行方向を 90 度回した向き（右手が +）
+                const float sideX = vz * _avoidSide;
+                const float sideZ = -vx * _avoidSide;
+
+                // 前 3 割・横 7 割で回り込む
+                vx = vx * 0.3f + sideX * 0.7f;
+                vz = vz * 0.3f + sideZ * 0.7f;
+
+                const float len = sqrtf(vx * vx + vz * vz);
+                if (len > 1e-5f) { vx /= len; vz /= len; }
+            }
+            _controller.SetMoveVelocity(vx * ChaseSpeed(), vz * ChaseSpeed());
         }
         else
         {
@@ -158,6 +193,8 @@ void Enemy::Reset(const DirectX::XMFLOAT3& pos)
     _lastHitAttackId = 0;
     _state = State::Idle;      // ChangeState だと同じ状態のとき何もしないので直接代入する
     _stateTime = 0.0f;
+    _prevPos = pos;
+    _avoidTimer = 0.0f;
 
     _actor.SetPosition(pos);
     _actor.SetRotationY(0.0f);

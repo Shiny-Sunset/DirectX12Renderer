@@ -219,6 +219,7 @@
     <ClInclude Include="Spawner.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CharacterController.h" />
+    <ClInclude Include="GameConfig.h" />
     <ClInclude Include="GameTimer.h" />
     <ClInclude Include="Ground.h" />
     <ClInclude Include="Input.h" />

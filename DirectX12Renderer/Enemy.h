@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <DirectXMath.h>
 #include "Collision.h"
+#include "GameConfig.h"
 
 class GltfActor;
 class CharacterController;
@@ -40,6 +41,9 @@ public:
     int HP() const { return _hp; }
     bool IsDead() const { return _state == State::Dead; }
 
+    float ChaseSpeed() const { return _chaseSpeed; }
+    void SetChaseSpeed(float s) { _chaseSpeed = s; }
+
     // -- 当たり判定 --
     Sphere BodySphere() const;     // 自分の体
     Sphere AttackSphere() const;   // 攻撃の判定（アクティブな時間だけ意味を持つ）
@@ -58,20 +62,25 @@ private:
     void FaceTowards(float dirX, float dirZ, float deltaTime);
 
     // -- 定数：探索と移動 --
-    static constexpr float DetectRange = 5.0f;    // この距離まで近づくと気づく
-    static constexpr float LoseRange = 8.0f;      // この距離まで離れると見失う
+    float DetectRange = GameConfig::Enemy::DetectRange;    // この距離まで近づくと気づく
+    float LoseRange = GameConfig::Enemy::LoseRange;      // この距離まで離れると見失う
                                                   // (気づく距離と変えて、境目でのばたつきを防ぐ)
-    static constexpr float StopDistance = 0.4f;   // これ以上は近づかない
-    static constexpr float ChaseSpeed = 2.0f;     // 追跡する速さ（m/秒）
-    static constexpr float TurnSpeed = 8.0f;      // 向きを変える速さ
+    float StopDistance = GameConfig::Enemy::StopDistance;   // これ以上は近づかない
+    float _chaseSpeed = GameConfig::Enemy::ChaseSpeed;     // 追跡する速さ（m/秒）
+    float TurnSpeed = GameConfig::Enemy::TurnSpeed;      // 向きを変える速さ
+
+    // -- 障害物の回避 --
+    // 壁に押し付けられて動けないとき、一定時間だけ横へ逸れる
+    static constexpr float AvoidTime = 0.7f;        // 逸れる時間
+    static constexpr float StuckThreshold = 0.3f;   // 予定の何割しか進めなければ詰まりとみなす
 
     // -- 定数：戦闘 --
-    static constexpr float AttackRange = 0.6f;      // この距離で攻撃を始める
-    static constexpr float AttackDuration = 0.8f;   // 攻撃全体の長さ
-    static constexpr float AttackHitTime = 0.3f;    // 攻撃判定が出る時刻
-    static constexpr float AttackCooldown = 1.5f;   // 次に攻撃できるまでの間隔
-    static constexpr float DamagedTime = 0.4f;      // のけぞっている時間
-    static constexpr float KnockbackSpeed = 4.0f;   // 被弾時に弾かれる速さ
+    float AttackRange = GameConfig::Enemy::AttackRange;      // この距離で攻撃を始める
+    float AttackDuration = GameConfig::Enemy::AttackDuration;   // 攻撃全体の長さ
+    float AttackHitTime = GameConfig::Enemy::AttackHitTime;    // 攻撃判定が出る時刻
+    float AttackCooldown = GameConfig::Enemy::AttackCooldown;   // 次に攻撃できるまでの間隔
+    float DamagedTime = GameConfig::Enemy::DamagedTime;      // のけぞっている時間
+    float KnockbackSpeed = GameConfig::Enemy::KnockbackSpeed;   // 被弾時に弾かれる速さ
 
     // -- 参照するもの（所有しない） --
     GltfActor& _actor;
@@ -80,7 +89,11 @@ private:
     // -- 状態 --
     State _state = State::Idle;
     float _stateTime = 0.0f;             // 今の状態になってからの経過秒数
-    int _hp = 2;
+    int _hp = GameConfig::Enemy::MaxHP;
     float _cooldown = 0.0f;              // 次の攻撃までの残り時間
     unsigned int _lastHitAttackId = 0;   // 最後に食らった攻撃の番号（多段ヒット防止）
+
+    DirectX::XMFLOAT3 _prevPos = { 0.0f, 0.0f, 0.0f };
+    float _avoidTimer = 0.0f;
+    float _avoidSide = 1.0f;   // +1 で右、-1 で左
 };

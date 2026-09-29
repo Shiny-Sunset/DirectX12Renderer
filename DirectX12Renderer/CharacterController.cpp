@@ -14,6 +14,7 @@ void CharacterController::Update(float deltaTime)
 {
     // -- 重力で下向きの速度を増やす --
     _velocity.y += _gravity * deltaTime;
+    _velocity.y = std::max(_velocity.y, MaxFallSpeed);
 
     // -- 速度に従って位置を進める --
     DirectX::XMFLOAT3 pos = _actor.Position();
