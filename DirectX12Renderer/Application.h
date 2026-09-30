@@ -93,6 +93,11 @@ private:
 		return static_cast<int>(_survivedTime * PointPerSecond) + _killCount * PointPerKill;
 	}
 
+#ifdef _DEBUG
+	bool _showDebugUI = true;
+#else
+	bool _showDebugUI = false;
+#endif
 	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
 	void BuildDebugUI();
 

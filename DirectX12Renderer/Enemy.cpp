@@ -13,18 +13,37 @@ Enemy::Enemy(GltfActor& actor, CharacterController& controller)
     _actor.PlayAnimation("Idle", 0.0f);
 }
 
-void Enemy::Update(float deltaTime, const DirectX::XMFLOAT3& targetPos, float targetRadius)
+void Enemy::Update(float deltaTime, const GameConfig::Enemy::Target& target, const GameConfig::Enemy::Target& player)
 {
     _stateTime += deltaTime;
     _cooldown = std::max(0.0f, _cooldown - deltaTime);
+    _aggroTimer = std::max(0.0f, _aggroTimer - deltaTime);
+
+    // 殴られた直後はプレイヤーを狙う。ただし離されすぎたら諦める
+    const GameConfig::Enemy::Target* aim = &target;
+    if (_aggroTimer > 0.0f)
+    {
+        const float pdx = player.position.x - _actor.Position().x;
+        const float pdz = player.position.z - _actor.Position().z;
+        const float pdist = sqrtf(pdx * pdx + pdz * pdz);
+
+        if (pdist <= LoseRange)
+        {
+            aim = &player;
+        }
+        else
+        {
+            _aggroTimer = 0.0f;   // 見失った
+        }
+    }
 
     // -- プレイヤーまでの距離（水平方向のみ） --
     const auto& myPos = _actor.Position();
-    const float dx = targetPos.x - myPos.x;
-    const float dz = targetPos.z - myPos.z;
+    const float dx = aim->position.x - myPos.x;
+    const float dz = aim->position.z - myPos.z;
     const float dist = sqrtf(dx * dx + dz * dz);
     // 相手の表面までの距離。自分の半径も引いて「隙間」を測る
-    const float gap = dist - targetRadius - _controller.Radius();
+    const float gap = dist - aim->radius - _controller.Radius();
 
     switch (_state)
     {
@@ -132,6 +151,7 @@ void Enemy::TakeDamage(int amount, unsigned int attackId, float fromX, float fro
     if (_state == State::Dead) return;
     if (attackId == _lastHitAttackId) return;   // 同じ振りで既に当たっている
     _lastHitAttackId = attackId;
+    _aggroTimer = GameConfig::Enemy::AggroTime;
 
     _hp -= amount;
 
@@ -182,6 +202,7 @@ Sphere Enemy::AttackSphere() const
 bool Enemy::IsAttackActive() const
 {
     return _state == State::Attack
+        && !_attackLanded
         && _stateTime >= AttackHitTime
         && _stateTime < AttackHitTime + 0.1f;
 }
@@ -191,6 +212,7 @@ void Enemy::Reset(const DirectX::XMFLOAT3& pos)
     _hp = 2;
     _cooldown = 0.0f;
     _lastHitAttackId = 0;
+    _attackLanded = false;
     _state = State::Idle;      // ChangeState だと同じ状態のとき何もしないので直接代入する
     _stateTime = 0.0f;
     _prevPos = pos;
@@ -222,9 +244,12 @@ void Enemy::ChangeState(State next)
     {
     case State::Idle:    _actor.PlayAnimation("Idle"); break;
     case State::Chase:   _actor.PlayAnimation("Walk"); break;
-    case State::Attack:  _actor.PlayAnimation("Attack", 0.05f); break;
-    case State::Damaged: _actor.PlayAnimation("Attack", 0.05f); break;   // 専用が無いので流用
-    case State::Dead:    _actor.PlayAnimation("Idle", 0.2f); break;
+    case State::Attack:  
+        _actor.PlayAnimation("Attack", 0.05f, false); 
+        _attackLanded = false;
+        break;
+    case State::Damaged: _actor.PlayAnimation("Damaged", 0.05f, false); break;
+    case State::Dead:    _actor.PlayAnimation("Dead", 0.2f, false); break;
     }
 }
 
@@ -233,4 +258,9 @@ void Enemy::FaceTowards(float dirX, float dirZ, float deltaTime)
     const float targetYaw = atan2f(dirX, dirZ);
     const float diff = DirectX::XMScalarModAngle(targetYaw - _actor.RotationY());
     _actor.SetRotationY(_actor.RotationY() + diff * std::min(1.0f, TurnSpeed * deltaTime));
+}
+
+void Enemy::NotifyAttackLanded()
+{
+    _attackLanded = true;
 }

@@ -49,13 +49,13 @@ bool EnemyPool::Spawn(const DirectX::XMFLOAT3& pos, float speedScale)
     return false;   // 空きが無い（同時出現数の上限に達している）
 }
 
-void EnemyPool::Update(float deltaTime, const DirectX::XMFLOAT3& targetPos, float targetRadius)
+void EnemyPool::Update(float deltaTime, const GameConfig::Enemy::Target& king, const GameConfig::Enemy::Target& player)
 {
     for (size_t i = 0; i < _enemies.size(); ++i)
     {
         if (!_active[i]) continue;
 
-        _enemies[i]->Update(deltaTime, targetPos, targetRadius);
+        _enemies[i]->Update(deltaTime, king, player);
 
         if (!_actors[i]->IsVisible())
         {

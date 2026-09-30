@@ -116,9 +116,9 @@ void Player::ChangeState(State next)
 	switch (_state)
 	{
 	case State::Move:    /* Move 中は UpdateMove がアニメーションを決める */ break;
-	case State::Attack:  _actor.PlayAnimation("Curl_up1", 0.05f); ++_attackId; break;
-	case State::Damaged: _actor.PlayAnimation("Curl_up_loop", 0.05f); break;
-	case State::Dead:    _actor.PlayAnimation("Curl_up_loop", 0.2f); break;
+	case State::Attack:  _actor.PlayAnimation("Attack", 0.05f, false); ++_attackId; break;
+	case State::Damaged: _actor.PlayAnimation("Damaged", 0.05f, false); break;
+	case State::Dead:    _actor.PlayAnimation("Dead", 0.2f, false); break;
 	}
 }
 
@@ -179,7 +179,7 @@ void Player::UpdateMove(float deltaTime, const Input& input, float cameraYaw, bo
 	}
 
 	// -- 4. 空中のアニメーション --
-	if (!onGround) _actor.PlayAnimation("Curl_up_loop", 0.1f);
+	if (!onGround) _actor.PlayAnimation("Fall", 0.1f);
 }
 
 void Player::FaceTowards(float dirX, float dirZ, float deltaTime)

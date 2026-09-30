@@ -46,7 +46,17 @@ void GltfActor::Update(float deltaTime)
 	if (_currentAnimation >= 0)
 	{
 		// -- 再生位置を進める --
-		_animTime = std::fmod(_animTime + deltaTime, _model.Animations()[_currentAnimation].duration);
+		const float duration = _model.Animations()[_currentAnimation].duration;
+		_animTime += deltaTime;
+
+		if (_loop)
+		{
+			_animTime = std::fmod(_animTime, duration);
+		}
+		else
+		{
+			_animTime = std::min(_animTime, duration);   // 最後で止める
+		}
 
 		if (_prevAnimation >= 0)
 		{
@@ -440,7 +450,7 @@ void GltfActor::BlendNodes(const std::vector<GltfModel::Node>& a, const std::vec
 	}
 }
 
-bool GltfActor::PlayAnimation(const std::string& name, float blendSeconds)
+bool GltfActor::PlayAnimation(const std::string& name, float blendSeconds, bool loop)
 {
 	for (size_t i = 0; i < _model.Animations().size(); ++i)
 	{
@@ -466,6 +476,7 @@ bool GltfActor::PlayAnimation(const std::string& name, float blendSeconds)
 
 		_currentAnimation = index;
 		_animTime = 0.0f;
+		_loop = loop;
 		return true;
 	}
 	std::cout << "PlayAnimation " << name << " is not found" << std::endl;

@@ -28,17 +28,25 @@ namespace GameConfig
     {
         constexpr int MaxHP = 2;
 
+        // 敵が狙う対象
+        struct Target
+        {
+            DirectX::XMFLOAT3 position;
+            float radius;
+        };
+
         // -- 定数：探索と移動 --
         constexpr float DetectRange = 5.0f;
         constexpr float StopDistance = 0.4f;     // 相手の表面からこの距離で止まる
         constexpr float LoseRange = 8.0f;
         constexpr float ChaseSpeed = 1.0f;
         constexpr float TurnSpeed = 8.0f;
+        constexpr float AggroTime = 5.0f;   // 殴られてからプレイヤーを追う時間（秒）
 
         // -- 定数：戦闘 --
         constexpr float AttackRange = 0.6f;
-        constexpr float AttackDuration = 0.8f;
-        constexpr float AttackHitTime = 0.3f;
+        constexpr float AttackDuration = 1.0f;
+        constexpr float AttackHitTime = 0.4f;
         constexpr float AttackCooldown = 1.5f;
         constexpr float DamagedTime = 0.4f;
         constexpr float KnockbackSpeed = 4.0f;

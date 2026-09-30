@@ -26,7 +26,7 @@ void King::TakeDamage(int amount)
 
     if (IsDestroyed())
     {
-        _actor.PlayAnimation("Defense", 0.2f);   // 丸まって耐える
+        _actor.PlayAnimation("Defense", 0.2f, false);   // 丸まって耐える
     }
 
 }

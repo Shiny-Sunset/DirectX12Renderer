@@ -40,7 +40,7 @@ public:
     // 名前でアニメーションを選んで再生を開始する
     // @param blendSeconds 前のアニメーションから混ぜながら移行する秒数（0 で即座に切り替え）
     // @return 見つかったら true
-    bool PlayAnimation(const std::string& name, float blendSeconds = 0.2f);
+    bool PlayAnimation(const std::string& name, float blendSeconds = 0.2f, bool loop = true);
 
     // アニメーションを止めて、バインドポーズに戻す
     void StopAnimation();
@@ -122,6 +122,7 @@ private:
     // -- アニメーションの再生状態 --
     int _currentAnimation = -1;   // 再生中のアニメーション(-1 = 停止)
     float _animTime = 0.0f;
+    bool _loop = true;
 
     // ブレンド（移行元として残っている、1 つ前のアニメーション）
     int _prevAnimation = -1;      // -1 ならブレンド中ではない

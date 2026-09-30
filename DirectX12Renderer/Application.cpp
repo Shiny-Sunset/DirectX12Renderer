@@ -93,7 +93,7 @@ bool Application::CreateGameWindow()
 
 	// ウィンドウオブジェクトの作成
 	_hwnd = CreateWindow(_windowClass.lpszClassName, // クラス名指定
-		_T("DX12テスト"),		// タイトルバーの文字
+		_T("DANGO DEFENSE"),	// タイトルバーの文字
 		WS_OVERLAPPEDWINDOW,	// タイトルバーと境界線のあるウィンドウ
 		CW_USEDEFAULT,			// 表示x座標はOSにお任せ
 		CW_USEDEFAULT,			// 表示y座標はOSにお任せ
@@ -291,7 +291,9 @@ void Application::Run()
 			_playerLogic->Update(dt, _input, _camera.Yaw(), !_debugUI->WantCaptureKeyboard());
 			_king->Update(dt);
 			for (auto& s : _spawners) s.Update(dt, _survivedTime, *_enemyPool, _tuning);   // 湧く
-			_enemyPool->Update(dt, _king->Position(), _king->BodySphere().radius);                            // 判断
+			const GameConfig::Enemy::Target kingTarget{ _king->Position(), _king->BodySphere().radius };
+			const GameConfig::Enemy::Target playerTarget{ _player->Position(), _playerController->Radius() };
+			_enemyPool->Update(dt, kingTarget, playerTarget);                            // 判断
 			CheckAttackHits();	// ヒット判定
 			// 床の高さを先に教えてから動かす
 			for (auto& c : _allControllers)
@@ -317,11 +319,13 @@ void Application::Run()
 				if (Intersects(atk, _king->BodySphere()))
 				{
 					_king->TakeDamage(1);
+					e->NotifyAttackLanded();
 					continue;
 				}
 				if (Intersects(atk, _playerLogic->BodySphere()))
 				{
 					_playerLogic->TakeDamage(1);
+					e->NotifyAttackLanded();
 				}
 			}
 
@@ -357,8 +361,12 @@ void Application::Run()
 		
 
 		// -- デバッグ UI の組み立て --
+		if (_input.IsTriggered(VK_F1))
+		{
+			_showDebugUI = !_showDebugUI;
+		}
 		_debugUI->BeginFrame();
-		BuildDebugUI();
+		if (_showDebugUI) BuildDebugUI();
 		BuildGameUI();
 		_debugUI->EndFrame();
 
@@ -600,9 +608,6 @@ void Application::BuildDebugUI()
 	ImGui::NewLine();
 
 	ImGui::End();
-
-	// ImGui で何ができるかの見本（慣れたら消す）
-	ImGui::ShowDemoWindow();
 }
 
 void Application::BuildGameUI()
@@ -644,6 +649,7 @@ void Application::BuildGameUI()
 		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "WASD    Move        Shift  Run");
 		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "Space   Jump        Click  Attack");
 		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "Mouse Right Drag    Camera");
+		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "F1      Debug Menu");
 		ImGui::Text(" ");
 
 		ImGui::SetWindowFontScale(1.5f);

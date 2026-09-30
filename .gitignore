@@ -71,5 +71,10 @@ DirectX12Renderer/motion/
 
 # 自作モデルは公開する
 !DirectX12Renderer/Model/DangoGirl.glb
+!DirectX12Renderer/Model/Ant.glb
+!DirectX12Renderer/Model/dangomushi.glb
 
 docs/
+
+# 提出用パッケージ（ビルド成果物）
+package/

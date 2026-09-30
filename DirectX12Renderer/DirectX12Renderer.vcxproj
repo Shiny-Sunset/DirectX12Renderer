@@ -49,7 +49,13 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <!--
+      全体最適化 (/GL) は切っている。
+      静的 CRT (/MT) と組み合わせると、リンク時のコード生成で
+      imgui_impl_win32.cpp が内部コンパイラエラー (C1001) を起こすため。
+      v145 (14.51.36260.0) 側の不具合で、こちらのコードでは回避できない。
+    -->
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -100,7 +106,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex;$(ProjectDir)External\imgui;$(ProjectDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex\Bin\Desktop_2026\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
@@ -136,9 +142,10 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex;$(ProjectDir)External\imgui;$(ProjectDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex\Bin\Desktop_2026\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>

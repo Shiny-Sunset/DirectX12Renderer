@@ -42,7 +42,7 @@ void CharacterController::Update(float deltaTime)
 
 void CharacterController::Jump()
 {
-    if (!_coyoteTime > 0.0f) return;   // 空中では跳べない
+    if (_coyoteTime <= 0.0f) return;   // 空中では跳べない
 
     // 「高さ h に到達する初速」を物理の式から求める
     //   v = √(2 × g × h)

@@ -2,6 +2,7 @@
 #include <DirectXMath.h>
 #include <memory>
 #include <vector>
+#include "GameConfig.h"
 
 class Dx12Wrapper;
 class GltfRenderer;
@@ -27,7 +28,7 @@ public:
 
     // @param targetPos 敵が目指す位置（王）
     // @param targetRadius 目標の当たり判定の半径
-    void Update(float deltaTime, const DirectX::XMFLOAT3& targetPos, float targetRadius);
+    void Update(float deltaTime, const GameConfig::Enemy::Target& king, const GameConfig::Enemy::Target& player);
 
     // 見た目の更新（当たり判定の解決後に呼ぶ）
     void UpdateActors(float deltaTime);

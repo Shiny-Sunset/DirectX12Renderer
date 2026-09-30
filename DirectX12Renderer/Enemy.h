@@ -25,15 +25,17 @@ public:
     Enemy(GltfActor& actor, CharacterController& controller);
 
     // -- 毎フレームの更新 --
-    // @param targetPos 目標の位置
-    // @param targetRadius 目標の当たり判定の半径（表面からの距離を測るのに使う）
-    void Update(float deltaTime, const DirectX::XMFLOAT3& targetPos, float targetRadius);
+    // @param target 本来狙う相手（王）
+    // @param player ヘイトが向いているときに狙う相手
+    void Update(float deltaTime, const GameConfig::Enemy::Target& target, const GameConfig::Enemy::Target& player);
 
     // -- 外からの働きかけ --
     // ダメージを受ける
     // @param attackId 攻撃の通し番号（同じ番号なら二重ヒットとして無視する）
     // @param fromX, fromZ 攻撃してきた相手の位置（ノックバックの向き）
     void TakeDamage(int amount, unsigned int attackId, float fromX, float fromZ);
+
+    void NotifyAttackLanded();
 
     // -- 状態の取得 --
     State CurrentState() const { return _state; }
@@ -96,4 +98,6 @@ private:
     DirectX::XMFLOAT3 _prevPos = { 0.0f, 0.0f, 0.0f };
     float _avoidTimer = 0.0f;
     float _avoidSide = 1.0f;   // +1 で右、-1 で左
+    float _aggroTimer = 0.0f;
+    bool _attackLanded = false;
 };
