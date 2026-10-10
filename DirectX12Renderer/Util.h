@@ -4,6 +4,16 @@
 #include <string>
 #include <utility>
 #include <d3d12.h>
+#include <d3dcompiler.h>
+
+// シェーダーをコンパイルするときのオプション
+// Debug ではシェーダーデバッガで追えるように最適化を切り、Release では最適化する。
+// Release でも最適化を切ったままにすると、ピクセルシェーダーの負荷がそのまま残る。
+#ifdef _DEBUG
+constexpr UINT ShaderCompileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+constexpr UINT ShaderCompileFlags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+#endif
 
 // HRESULT を検査し、失敗ならエラーメッセージを出して false を返す
 // 成功時は _DEBUG のときだけ "is OK" を出力する

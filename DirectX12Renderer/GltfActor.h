@@ -132,8 +132,11 @@ private:
 
     // -- GPU リソース --
     ComPtr<ID3D12Resource> _transformBuff;
-    TransformBufferData* _mappedTransform = nullptr;   // マップしたまま保持
+    uint8_t* _mappedTransform = nullptr;   // マップしたまま保持
     ComPtr<ID3D12DescriptorHeap> _descHeap;
+    UINT _transformStride = 0;
+    TransformBufferData* Transform();
+    D3D12_GPU_VIRTUAL_ADDRESS TransformAddress() const;
 
     // -- 表示 --
     bool _outlineEnabled = true;   // 輪郭線を描くか

@@ -1,7 +1,5 @@
 ﻿#include "Dx12Wrapper.h"
-
 #include "Util.h"
-
 #include <DirectXTex.h>
 #include <algorithm>
 #include <iostream>
@@ -60,6 +58,8 @@ namespace
 
 Dx12Wrapper::~Dx12Wrapper()
 {
+	WaitForGpuIdle();
+	if (_fenceEvent != nullptr) { CloseHandle(_fenceEvent); _fenceEvent = nullptr; }
 	if (_mappedScene != nullptr)
 	{
 		_sceneConstBuff->Unmap(0, nullptr);
@@ -151,17 +151,22 @@ bool Dx12Wrapper::InitializeDXGIDevice()
 
 bool Dx12Wrapper::InitializeCommand()
 {
-	// -- コマンドリスト関連の初期化 --
-	auto result = _dev->CreateCommandAllocator(
-		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		IID_PPV_ARGS(&_cmdAllocator)
-	);
-	if (!CheckResult(result, "CreateCommandAllocator")) return false;
+	// -- コマンドアロケータをフレームの数だけ作る --
+	// GPU が使い終わるまでリセットできないので、フレームごとに別々に持つ
+	for (UINT i = 0; i < FrameCount; ++i)
+	{
+		auto r = _dev->CreateCommandAllocator(
+			D3D12_COMMAND_LIST_TYPE_DIRECT,
+			IID_PPV_ARGS(_frames[i].allocator.ReleaseAndGetAddressOf())
+		);
+		if (!CheckResult(r, "CreateCommandAllocator")) return false;
+	}
 
-	result = _dev->CreateCommandList(
+	// コマンドリストは 1 本で、Reset でアロケータを付け替える
+	auto result = _dev->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		_cmdAllocator.Get(),
+		_frames[0].allocator.Get(), 
 		nullptr,
 		IID_PPV_ARGS(&_cmdList)
 	);
@@ -188,6 +193,12 @@ bool Dx12Wrapper::InitializeCommand()
 	// -- フェンスの作成 --
 	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
 	if (!CheckResult(result, "CreateFence")) return false;
+
+	// フェンスイベントの作成
+	_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (_fenceEvent == nullptr) return false;
+
+	_cmdList->Close();
 
 	return true;
 }
@@ -346,7 +357,8 @@ bool Dx12Wrapper::CreateSceneConstantBuffer()
 	D3D12_RESOURCE_DESC constResDesc = {};
 
 	constResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	constResDesc.Width = AlignmentedSize(sizeof(SceneMatrix), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	_sceneCBStride = static_cast<UINT>(AlignmentedSize(sizeof(SceneMatrix), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+	constResDesc.Width = _sceneCBStride * FrameCount;
 	constResDesc.Height = 1;                          // 必ず 1
 	constResDesc.DepthOrArraySize = 1;                // 必ず 1
 	constResDesc.MipLevels = 1;                       // 必ず 1
@@ -366,7 +378,7 @@ bool Dx12Wrapper::CreateSceneConstantBuffer()
 	);
 	if (!CheckResult(result, "CreateCommittedResource _sceneConstBuff")) return false;
 
-	result = _sceneConstBuff->Map(0, nullptr, (void**)&_mappedScene);	// マップ
+	result = _sceneConstBuff->Map(0, nullptr, reinterpret_cast<void**>(&_mappedScene));	// マップ
 	if (!CheckResult(result, "_sceneConstBuff->Map")) return false;
 
 	return true;
@@ -457,7 +469,7 @@ bool Dx12Wrapper::CreateShadowMap()
 
 	D3D12_RESOURCE_DESC resDesc = {};
 	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Width = ShadowMapSize;      // 1024 で十分
+	resDesc.Width = ShadowMapSize;
 	resDesc.Height = ShadowMapSize;
 	resDesc.DepthOrArraySize = 1;
 	resDesc.MipLevels = 1;
@@ -582,9 +594,11 @@ void Dx12Wrapper::SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT
 		nearZ,	// 近いほう
 		farZ	// 遠いほう
 	);
-	_mappedScene->view = viewmat;
-	_mappedScene->proj = projmat;
-	_mappedScene->eye = eye;
+
+	auto* s = Scene();
+	s->view = viewmat;
+	s->proj = projmat;
+	s->eye = eye;
 }
 
 void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
@@ -622,10 +636,11 @@ void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 
 	auto lightProj = DirectX::XMMatrixOrthographicLH(_shadowArea, _shadowArea, LightNear, LightFar);
 
-	_mappedScene->lightCamera = lightView * lightProj;
-	_mappedScene->lightVec = _lightVec;
-	_mappedScene->shadowMapTexel = 1.0f / static_cast<float>(ShadowMapSize);
-	_mappedScene->lightRange = LightFar - LightNear;
+	auto* s = Scene();
+	s->lightCamera = lightView * lightProj;
+	s->lightVec = _lightVec;
+	s->shadowMapTexel = 1.0f / static_cast<float>(ShadowMapSize);
+	s->lightRange = LightFar - LightNear;
 }
 
 void Dx12Wrapper::BeginShadowPass()
@@ -710,6 +725,22 @@ void Dx12Wrapper::BeginBackBufferPass()
 	_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 }
 
+void Dx12Wrapper::BeginFrame()
+{
+	assert(_frameIndex < FrameCount);
+	auto& f = _frames[_frameIndex];
+
+	// このフレームのリソースを GPU が使い終わるまで待つ
+	if (_fence->GetCompletedValue() < f.fenceValue)
+	{
+		_fence->SetEventOnCompletion(f.fenceValue, _fenceEvent);
+		WaitForSingleObject(_fenceEvent, INFINITE);
+	}
+
+	f.allocator->Reset();
+	_cmdList->Reset(f.allocator.Get(), nullptr);
+}
+
 void Dx12Wrapper::EndDraw()
 {
 	// リソースバリアの指定(描画完了 → 表示できる状態に戻す)
@@ -727,36 +758,31 @@ void Dx12Wrapper::EndDraw()
 	ID3D12CommandList* cmdlists[] = { _cmdList.Get() };
 	_cmdQueue->ExecuteCommandLists(1, cmdlists);
 
-	// -- GPUの処理を待つ(フェンスによる同期) --
-	WaitForCommandQueue();
-
-	// GPUの処理が終わったので、ここで初めてResetできる
-	_cmdAllocator->Reset();						// キューをクリア
-	_cmdList->Reset(_cmdAllocator.Get(), nullptr);	// 再びコマンドリストを貯める準備
-}
-
-void Dx12Wrapper::WaitForCommandQueue()
-{
-	_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
-	if (_fence->GetCompletedValue() != _fenceVal)
-	{
-		// イベントを作ってGPUの完了を待つ
-		// イベントハンドルの取得
-		auto event = CreateEvent(nullptr, false, false, nullptr);
-		_fence->SetEventOnCompletion(_fenceVal, event);
-		// イベントが発生するまで待ち続ける
-		WaitForSingleObject(event, INFINITE);
-		// イベントハンドルを閉じる
-		CloseHandle(event);
-	}
+	// 「このフレームはここまで」という印をキューに積む（待たない）
+	const UINT64 value = ++_fenceVal;
+	_cmdQueue->Signal(_fence.Get(), value);
+	_frames[_frameIndex].fenceValue = value;
 }
 
 void Dx12Wrapper::Flip()
 {
 	// 第1引数(SyncInterval)は「何回の垂直同期を待ってから表示するか」
-	//   1 = モニターのリフレッシュレートに同期する（60Hz なら 60 FPS が上限）
-	//   0 = 待たずに即座に表示する（上限なし）
+	// 1 = モニターのリフレッシュレートに同期する（60Hz なら 60 FPS が上限）
+	// 0 = 待たずに即座に表示する（上限なし）
 	_swapchain->Present(_vsyncEnabled ? 1 : 0, 0);
+	_frameIndex = (_frameIndex + 1) % FrameCount;
+}
+
+void Dx12Wrapper::WaitForGpuIdle()
+{
+	const UINT64 value = ++_fenceVal;
+	_cmdQueue->Signal(_fence.Get(), value);
+
+	if (_fence->GetCompletedValue() < value)
+	{
+		_fence->SetEventOnCompletion(value, _fenceEvent);
+		WaitForSingleObject(_fenceEvent, INFINITE);
+	}
 }
 
 ComPtr<ID3D12Resource> Dx12Wrapper::CreateTextureFromMemory(const uint8_t* data, size_t size)

@@ -28,7 +28,7 @@ bool Ground::CompileShaders()
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
         "GroundVS", "vs_5_0",	// 関数は GroundVS、対象シェーダーは vs_5_0
-        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+        ShaderCompileFlags,
         0,
         &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
     );
@@ -42,7 +42,7 @@ bool Ground::CompileShaders()
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
         "GroundPS", "ps_5_0",	// 関数は GroundPS、対象シェーダーは ps_5_0
-        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+        ShaderCompileFlags,
         0,
         &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
     );

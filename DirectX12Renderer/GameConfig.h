@@ -59,7 +59,7 @@ namespace GameConfig
     namespace King
     {
         constexpr int MaxHP = 50;
-        constexpr float Scale = 1.0f;
+        constexpr float Scale = 2.0f;
         constexpr float BaseRadius = 0.7f;
     }
 

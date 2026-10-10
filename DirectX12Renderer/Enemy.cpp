@@ -48,20 +48,16 @@ void Enemy::Update(float deltaTime, const GameConfig::Enemy::Target& target, con
     switch (_state)
     {
     case State::Idle:
+        // 湧いた直後の 1 フレームだけ通る状態。
+        // 防衛ゲームなので、検知範囲を待たずに最初から王へ向かわせる
+        // (当初は dist < DetectRange で Chase へ移していた。DetectRange は現在未使用)
         _controller.SetMoveVelocity(0.0f, 0.0f);
-        //if (dist < DetectRange)
-        //{
-        //    ChangeState(State::Chase);
-        //}
         ChangeState(State::Chase);
         break;
 
     case State::Chase:
-        //if (dist > LoseRange)
-        //{
-        //    ChangeState(State::Idle);
-        //    break;
-        //}
+        // 見失って Idle へ戻る処理は入れていない（上記のとおり常に王を狙う）。
+        // LoseRange はヘイトがプレイヤーへ向いているときの判定にだけ使っている
 
         // -- 距離に関係なく、常にプレイヤーの方を向く --
         // dist が 0 に近いと方向が定まらないので、そのときは向きを変えない
@@ -98,6 +94,7 @@ void Enemy::Update(float deltaTime, const GameConfig::Enemy::Target& target, con
                 _avoidTimer -= deltaTime;
 
                 // 進行方向を 90 度回した向き（右手が +）
+                // cross(up, dir) の展開。up = (0,1,0) で dir.y = 0 なので (dz, 0, -dx) になる
                 const float sideX = vz * _avoidSide;
                 const float sideZ = -vx * _avoidSide;
 

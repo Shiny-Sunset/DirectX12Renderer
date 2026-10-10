@@ -28,7 +28,7 @@ bool Pera::CompileShaders()
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
         "PeraVS", "vs_5_0",	// 関数は PeraVS、対象シェーダーは vs_5_0
-        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+        ShaderCompileFlags,
         0,
         &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
     );
@@ -42,7 +42,7 @@ bool Pera::CompileShaders()
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
         "PeraPS", "ps_5_0",	// 関数は PeraPS、対象シェーダーは ps_5_0
-        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+        ShaderCompileFlags,
         0,
         &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
     );

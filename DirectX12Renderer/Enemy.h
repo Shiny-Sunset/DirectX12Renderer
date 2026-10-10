@@ -64,6 +64,7 @@ private:
     void FaceTowards(float dirX, float dirZ, float deltaTime);
 
     // -- 定数：探索と移動 --
+    // 現在は未使用。常に王へ向かう仕様にしたため（Enemy::Update の Idle を参照）
     float DetectRange = GameConfig::Enemy::DetectRange;    // この距離まで近づくと気づく
     float LoseRange = GameConfig::Enemy::LoseRange;      // この距離まで離れると見失う
                                                   // (気づく距離と変えて、境目でのばたつきを防ぐ)

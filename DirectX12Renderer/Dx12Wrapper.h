@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <cassert>
 
 // DirectX12 の基盤部分をまとめたクラス
 // デバイス、スワップチェーン、コマンド関連、レンダーターゲット、深度バッファ、
@@ -48,12 +49,18 @@ public:
 
 	void BeginBackBufferPass();  // 2 パス目：バックバッファへ描き始める
 
+	// フレームの開始
+	void BeginFrame();
+
 	// 描画終了
 	// リソースバリア、コマンドリストのクローズと実行、GPU の完了待ち、リセットまで行う
 	void EndDraw();
 
 	// 画面のスワップ(フリップ)
 	void Flip();
+
+	// GPU の処理完了を待つ
+	void WaitForGpuIdle();
 
 	// ------------------------------------------------------------
 	// カメラと光源（シーン用定数バッファ b0 の中身）
@@ -93,8 +100,11 @@ public:
 	// GPU 側のアドレス。ルートディスクリプタとして直接渡すときに使う
 	D3D12_GPU_VIRTUAL_ADDRESS SceneConstantBufferAddress() const
 	{
-		return _sceneConstBuff->GetGPUVirtualAddress();
+		return _sceneConstBuff->GetGPUVirtualAddress() + _frameIndex * _sceneCBStride;
 	}
+
+	static constexpr UINT FrameCount = 1;
+	UINT FrameIndex() const { return _frameIndex; }
 
 	// ------------------------------------------------------------
 	// テクスチャ
@@ -166,6 +176,15 @@ private:
 		float _pad1[3];
 	};
 
+	static_assert(sizeof(SceneMatrix) % 16 == 0, "HLSL の定数バッファは 16 バイト単位で詰まる");
+
+	// 1 フレーム分の、CPU と GPU で取り合いになるリソース
+	struct FrameResource
+	{
+		ComPtr<ID3D12CommandAllocator> allocator;
+		UINT64 fenceValue = 0;   // このフレームの描画完了を表すフェンスの値
+	};
+
 	// シャドウマップの解像度
 	static constexpr UINT ShadowMapSize = 2048;
 
@@ -185,16 +204,12 @@ private:
 	ComPtr<ID3D12Resource> CreateBlackTexture();
 	ComPtr<ID3D12Resource> CreateGrayGradationTexture();
 
-	// GPU の処理完了を待つ
-	void WaitForCommandQueue();
-
 	// -- デバイスと DXGI --
 	ComPtr<ID3D12Device> _dev;
 	ComPtr<IDXGIFactory6> _dxgiFactory;
 	ComPtr<IDXGISwapChain4> _swapchain;
 
 	// -- コマンド関連 --
-	ComPtr<ID3D12CommandAllocator> _cmdAllocator;
 	ComPtr<ID3D12GraphicsCommandList> _cmdList;
 	ComPtr<ID3D12CommandQueue> _cmdQueue;
 	ComPtr<ID3D12Fence> _fence;
@@ -221,7 +236,14 @@ private:
 
 	// -- シーン用定数バッファ --
 	ComPtr<ID3D12Resource> _sceneConstBuff;
-	SceneMatrix* _mappedScene = nullptr;   // マップ先(Unmap はデストラクタで行う)
+	uint8_t* _mappedScene = nullptr;   // マップ先の先頭(バイト単位で進めるので uint8_t*)
+	UINT _sceneCBStride = 0;
+
+	// 今のフレームが書き込む領域
+	SceneMatrix* Scene()
+	{
+		return reinterpret_cast<SceneMatrix*>(_mappedScene + _frameIndex * _sceneCBStride);
+	}
 
 	// -- 平行光源 --
 	DirectX::XMFLOAT3 _lightVec = { 1.0f, -1.0f, 1.0f };   // 光が進む向き（斜め上から）
@@ -245,4 +267,8 @@ private:
 	int _windowWidth = 0;
 	int _windowHeight = 0;
 	bool _vsyncEnabled = true;   // 垂直同期を待つか
+
+	FrameResource _frames[FrameCount];
+	UINT _frameIndex = 0;
+	HANDLE _fenceEvent = nullptr;
 };

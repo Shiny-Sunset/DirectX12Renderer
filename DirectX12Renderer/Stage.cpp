@@ -41,6 +41,7 @@ bool Stage::Init()
     if (!CompileShaders()) return false;
     if (!CreateVertexAndIndexBuffer()) return false;
     if (!CreateRootSignature()) return false;
+    if (!CreateShadowRootSignature()) return false;
     if (!CreatePipelineState()) return false;
 
     return true;
@@ -56,7 +57,7 @@ bool Stage::CompileShaders()
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
         "StageVS", "vs_5_0",	// 関数は GroundVS、対象シェーダーは vs_5_0
-        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+        ShaderCompileFlags,
         0,
         &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
     );
@@ -70,7 +71,7 @@ bool Stage::CompileShaders()
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
         "StagePS", "ps_5_0",	// 関数は GroundPS、対象シェーダーは ps_5_0
-        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+        ShaderCompileFlags,
         0,
         &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
     );
@@ -80,7 +81,7 @@ bool Stage::CompileShaders()
     result = D3DCompileFromFile(
         L"StageShadowVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
         "StageShadowVS", "vs_5_0",
-        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0,
+        ShaderCompileFlags, 0,
         &_shadowVsBlob, &errorBlob
     );
     if (!CheckShaderResult(result, errorBlob.Get(), "StageShadowVertexShader")) return false;
@@ -123,9 +124,8 @@ void Stage::DrawShadow()
     auto cmdList = _dx12.CommandList();
 
     cmdList->SetPipelineState(_shadowPipelineState.Get());
-    cmdList->SetGraphicsRootSignature(_rootSignature.Get());
+    cmdList->SetGraphicsRootSignature(_shadowRootSignature.Get());
 
-    // 0 番だけ設定する。2 番(シャドウマップ)は、このパスでは読まないので不要
     cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
 
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -244,7 +244,6 @@ bool Stage::CreateVertexAndIndexBuffer()
 
 bool Stage::CreateRootSignature()
 {
-    auto cmdList = _dx12.CommandList();
     // ディスクリプタレンジの作成
     D3D12_DESCRIPTOR_RANGE descTblRange = {};
 
@@ -320,6 +319,58 @@ bool Stage::CreateRootSignature()
     return true;
 }
 
+bool Stage::CreateShadowRootSignature()
+{
+    // 影パスは深度しか書かない。
+    D3D12_ROOT_PARAMETER rootParam[2] = {};
+
+    // 0 番: シーン定数(b0)。lightCamera を読む
+    rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rootParam[0].Descriptor.ShaderRegister = 0;
+    rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    // 1 番: 箱ごとのワールド行列(b1)。通常描画と同じく 32bit 定数で渡す
+    rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    rootParam[1].Constants.ShaderRegister = 1;
+    rootParam[1].Constants.Num32BitValues = 16;
+    rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+    rootSignatureDesc.Flags =
+        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+        | D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS
+        | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS
+        | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS
+        | D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+    rootSignatureDesc.pParameters = rootParam;
+    rootSignatureDesc.NumParameters = 2;
+    rootSignatureDesc.pStaticSamplers = nullptr;
+    rootSignatureDesc.NumStaticSamplers = 0;
+
+    // バイナリコードの作成
+    ComPtr<ID3DBlob> rootSigBlob;
+    ComPtr<ID3DBlob> errorBlob;
+    auto result = D3D12SerializeRootSignature(
+        &rootSignatureDesc,
+        D3D_ROOT_SIGNATURE_VERSION_1_0,
+        &rootSigBlob,
+        &errorBlob
+    );
+    if (!CheckShaderResult(result, errorBlob.Get(), "D3D12SerializeRootSignature (stage shadow)")) return false;
+
+
+    // ルートシグネチャオブジェクトの作成
+    result = _dx12.Device()->CreateRootSignature(
+        0,
+        rootSigBlob->GetBufferPointer(),
+        rootSigBlob->GetBufferSize(),
+        IID_PPV_ARGS(&_shadowRootSignature)
+    );
+    if (!CheckResult(result, "CreateRootSignature (stage shadow)")) return false;
+
+    return true;
+}
+
 bool Stage::CreatePipelineState()
 {
     // -- 頂点レイアウト(インプットレイアウト)の作成 --
@@ -390,7 +441,8 @@ bool Stage::CreatePipelineState()
     if (!CheckResult(result, "CreateGraphicsPipelineState")) return false;
 
     // -- 影用 PSO --
-      // ルートシグネチャは通常描画と同じものを使い回す
+    gpipeline.pRootSignature = _shadowRootSignature.Get();
+
     gpipeline.VS.pShaderBytecode = _shadowVsBlob->GetBufferPointer();
     gpipeline.VS.BytecodeLength = _shadowVsBlob->GetBufferSize();
 
@@ -445,7 +497,6 @@ float Stage::GroundHeightAt(float x, float z, float maxY) const
 
 DirectX::XMMATRIX Stage::BoxWorldMatrix(const AABB& b) const
 {
-    auto cmdList = _dx12.CommandList();
     // 単位キューブを、箱の大きさと位置に合わせて変形する行列
     auto world = DirectX::XMMatrixScaling(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z)
         * DirectX::XMMatrixTranslation(

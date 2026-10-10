@@ -52,6 +52,9 @@ float ComputeBrightness(float3 n, float3 lightVec, float4 tpos,
     static const float ShadowLevel = 0.4; // 影の暗さ
     
     float ndl = dot(-normalize(lightVec), n);
-    float lit = ComputeShadowLit(tpos, ndl, shadowMap, shadowSmp) * saturate(ndl * 2.0);
+    // saturate(ndl * 2.0) は ComputeShadowLit の中で掛けている。
+    // ここで再度掛けると、キャラクター(ComputeShadowLit を直接呼ぶ)との間で
+    // 陰影が食い違う(光源の仰角が低いときに地面だけ極端に暗くなる)
+    float lit = ComputeShadowLit(tpos, ndl, shadowMap, shadowSmp);
     return lerp(ShadowLevel, 1.0, lit);
 }

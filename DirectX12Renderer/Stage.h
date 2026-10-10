@@ -37,6 +37,7 @@ private:
     bool CompileShaders();
     bool CreateVertexAndIndexBuffer();
     bool CreateRootSignature();
+    bool CreateShadowRootSignature();
     bool CreatePipelineState();
 
     DirectX::XMMATRIX BoxWorldMatrix(const AABB& b) const;
@@ -66,6 +67,7 @@ private:
     ComPtr<ID3D12Resource> _idxBuff;
     D3D12_INDEX_BUFFER_VIEW _ibView = {};
     ComPtr<ID3D12RootSignature> _rootSignature;
+    ComPtr<ID3D12RootSignature> _shadowRootSignature;
     ComPtr<ID3D12PipelineState> _pipelineState;
     ComPtr<ID3D12PipelineState> _shadowPipelineState;
 };

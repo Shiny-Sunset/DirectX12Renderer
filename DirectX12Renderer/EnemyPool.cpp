@@ -22,7 +22,7 @@ bool EnemyPool::Init(size_t count)
         _actors.push_back(std::move(actor));
 
         auto ctrl = std::make_unique<CharacterController>(*_actors.back());
-        ctrl->SetRadius(0.3f);             // アリは小さい
+        ctrl->SetRadius(GameConfig::Enemy::Radius);   // アリは小さい
         ctrl->SetCollisionEnabled(false);  // 使用中になるまで判定しない
         _controllers.push_back(std::move(ctrl));
 

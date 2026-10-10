@@ -23,6 +23,7 @@ public:
 
 	// 描画前に、モデル間で共通の状態を設定する
 	void BeforeDraw();
+	void BeforeShadowDraw();
 
 	ID3D12PipelineState* PipelineState() const { return _pipelineState.Get(); }
 	ID3D12PipelineState* BlendPipelineState() const { return _blendPipelineState.Get(); }
@@ -39,6 +40,7 @@ private:
 
 	// ルートシグネチャの作成
 	bool CreateRootSignature();
+	bool CreateShadowRootSignature();
 
 	// グラフィックスパイプラインステートの作成
 	bool CreateGraphicsPipeline();
@@ -52,6 +54,7 @@ private:
 	ComPtr<ID3DBlob> _shadowVsBlob;
 
 	ComPtr<ID3D12RootSignature> _rootSignature;
+	ComPtr<ID3D12RootSignature> _shadowRootSignature;
 	ComPtr<ID3D12PipelineState> _pipelineState;
 	ComPtr<ID3D12PipelineState> _blendPipelineState;
 	ComPtr<ID3D12PipelineState> _outlinePipelineState;

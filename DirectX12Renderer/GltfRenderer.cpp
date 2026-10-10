@@ -21,6 +21,7 @@ bool GltfRenderer::Init()
 {
 	if (!CompileShaders()) return false;
 	if (!CreateRootSignature()) return false;
+	if (!CreateShadowRootSignature()) return false;
 	if (!CreateGraphicsPipeline()) return false;
 
 	return true;
@@ -36,7 +37,7 @@ bool GltfRenderer::CompileShaders()
 		nullptr,	// defineは無し
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
 		"GltfVS", "vs_5_0",	// 関数は GltfVS、対象シェーダーは vs_5_0
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+		ShaderCompileFlags,
 		0,
 		&_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
 	);
@@ -50,7 +51,7 @@ bool GltfRenderer::CompileShaders()
 		nullptr,	// defineは無し
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
 		"GltfPS", "ps_5_0",	// 関数は GltfPS、対象シェーダーは ps_5_0
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+		ShaderCompileFlags,
 		0,
 		&_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
 	);
@@ -62,7 +63,7 @@ bool GltfRenderer::CompileShaders()
 	result = D3DCompileFromFile(
 		L"GltfOutlineVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"GltfOutlineVS", "vs_5_0",
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0,
+		ShaderCompileFlags, 0,
 		&_outlineVsBlob, &errorBlob
 	);
 	if (!CheckShaderResult(result, errorBlob.Get(), "GltfOutlineVertexShader")) return false;
@@ -73,7 +74,7 @@ bool GltfRenderer::CompileShaders()
 	result = D3DCompileFromFile(
 		L"GltfOutlinePixelShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"GltfOutlinePS", "ps_5_0",
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0,
+		ShaderCompileFlags, 0,
 		&_outlinePsBlob, &errorBlob
 	);
 	if (!CheckShaderResult(result, errorBlob.Get(), "GltfOutlinePixelShader")) return false;
@@ -84,7 +85,7 @@ bool GltfRenderer::CompileShaders()
 	result = D3DCompileFromFile(
 		L"GltfShadowVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 		"ShadowVS", "vs_5_0",
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0,
+		ShaderCompileFlags, 0,
 		&_shadowVsBlob, &errorBlob
 	);
 	if (!CheckShaderResult(result, errorBlob.Get(), "GltfShadowVertexShader")) return false;
@@ -95,60 +96,53 @@ bool GltfRenderer::CompileShaders()
 bool GltfRenderer::CreateRootSignature()
 {
 	// ディスクリプタレンジの作成
-	D3D12_DESCRIPTOR_RANGE descTblRange[4] = {};
-
-	// b0: シーン行列
-	// b1: ボーン行列
-	descTblRange[0].NumDescriptors = 2;
-	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRange[0].BaseShaderRegister = 0;	// b0
-	descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	D3D12_DESCRIPTOR_RANGE descTblRange[3] = {};
 
 	// b2: マテリアル
-	descTblRange[1].NumDescriptors = 1;
-	descTblRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRange[1].BaseShaderRegister = 2;	// b2
-	descTblRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descTblRange[0].NumDescriptors = 1;
+	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descTblRange[0].BaseShaderRegister = 2;	// b2
+	descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// t0: baseColor テクスチャ
-	descTblRange[2].NumDescriptors = 1;
-	descTblRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descTblRange[2].BaseShaderRegister = 0;	// t0
-	descTblRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descTblRange[1].NumDescriptors = 1;
+	descTblRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descTblRange[1].BaseShaderRegister = 0;	// t0
+	descTblRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// t1: シャドウマップ
-	descTblRange[3].NumDescriptors = 1;
-	descTblRange[3].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descTblRange[3].BaseShaderRegister = 1;   // t1
-	descTblRange[3].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descTblRange[2].NumDescriptors = 1;
+	descTblRange[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descTblRange[2].BaseShaderRegister = 1;   // t1
+	descTblRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// ルートパラメーター(ディスクリプタテーブル)の作成
-	D3D12_ROOT_PARAMETER rootParam[3] = {};
+	D3D12_ROOT_PARAMETER rootParam[4] = {};
 
-	// 0 番: 行列(b0)。描画中は変わらないので 1 回だけ設定する
-	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	// ディスクリプタレンジの配列の先頭アドレス
-	rootParam[0].DescriptorTable.pDescriptorRanges = &descTblRange[0];
-	// ディスクリプタレンジ数
-	rootParam[0].DescriptorTable.NumDescriptorRanges = 1;
-	// すべてのシェーダーから見える
+	// 0 番: シーン定数(b0)
+	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParam[0].Descriptor.ShaderRegister = 0;
 	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-	
-	// 1 番: マテリアル(b2)とテクスチャ(t0)。マテリアルごとに付け替える
-	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	// ディスクリプタレンジの配列の先頭アドレス
-	rootParam[1].DescriptorTable.pDescriptorRanges = &descTblRange[1];
-	// ディスクリプタレンジ数
-	rootParam[1].DescriptorTable.NumDescriptorRanges = 2;
-	// すべてのシェーダーから見える
-	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	// 1 番: アクターの行列(b1)。描画中は変わらないので 1 回だけ設定する
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParam[1].Descriptor.ShaderRegister = 1;
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
-	// 2 番: シャドウマップ
+	// 2 番: マテリアル(b2)とテクスチャ(t0)。マテリアルごとに付け替える
 	rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[2].DescriptorTable.pDescriptorRanges = &descTblRange[3];
-	rootParam[2].DescriptorTable.NumDescriptorRanges = 1;
+	// ディスクリプタレンジの配列の先頭アドレス
+	rootParam[2].DescriptorTable.pDescriptorRanges = &descTblRange[0];
+	// ディスクリプタレンジ数
+	rootParam[2].DescriptorTable.NumDescriptorRanges = 2;
+	// すべてのシェーダーから見える
 	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	// 3 番: シャドウマップ(t1)
+	rootParam[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[3].DescriptorTable.pDescriptorRanges = &descTblRange[2];
+	rootParam[3].DescriptorTable.NumDescriptorRanges = 1;
+	rootParam[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	
 
 	// サンプラーの作成
@@ -179,7 +173,7 @@ bool GltfRenderer::CreateRootSignature()
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	rootSignatureDesc.pParameters = &rootParam[0];	// ルートパラメーターの先頭アドレス
-	rootSignatureDesc.NumParameters = 3;	// ルートパラメーター数
+	rootSignatureDesc.NumParameters = 4;	// ルートパラメーター数
 	rootSignatureDesc.pStaticSamplers = samplerDesc;
 	rootSignatureDesc.NumStaticSamplers = 2;
 
@@ -202,6 +196,59 @@ bool GltfRenderer::CreateRootSignature()
 		IID_PPV_ARGS(&_rootSignature)
 	);
 	if (!CheckResult(result, "CreateRootSignature")) return false;
+
+	return true;
+}
+
+bool GltfRenderer::CreateShadowRootSignature()
+{
+	// 影パスは深度しか書かない。
+	// ピクセルシェーダーが無いので、マテリアルもテクスチャもサンプラーも要らない。
+	// ディスクリプタテーブルが 1 つも無いため、ヒープの切り替えも不要になる。
+	D3D12_ROOT_PARAMETER rootParam[2] = {};
+
+	// 0 番: シーン定数(b0)。lightCamera を読む
+	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParam[0].Descriptor.ShaderRegister = 0;
+	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+	// 1 番: アクターの行列(b1)。world とボーン
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParam[1].Descriptor.ShaderRegister = 1;
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+	// 頂点レイアウトは使う。それ以外のステージからのアクセスは明示的に拒否する
+	rootSignatureDesc.Flags =
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+		| D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS
+		| D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS
+		| D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS
+		| D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+	rootSignatureDesc.pParameters = rootParam;
+	rootSignatureDesc.NumParameters = 2;
+	rootSignatureDesc.pStaticSamplers = nullptr;
+	rootSignatureDesc.NumStaticSamplers = 0;
+
+	// バイナリコードの作成
+	ComPtr<ID3DBlob> rootSigBlob;
+	ComPtr<ID3DBlob> errorBlob;
+	auto result = D3D12SerializeRootSignature(
+		&rootSignatureDesc,
+		D3D_ROOT_SIGNATURE_VERSION_1_0,
+		&rootSigBlob,
+		&errorBlob
+	);
+	if (!CheckShaderResult(result, errorBlob.Get(), "D3D12SerializeRootSignature (shadow)")) return false;
+
+	// ルートシグネチャオブジェクトの作成
+	result = _dx12.Device()->CreateRootSignature(
+		0,
+		rootSigBlob->GetBufferPointer(),
+		rootSigBlob->GetBufferSize(),
+		IID_PPV_ARGS(&_shadowRootSignature)
+	);
+	if (!CheckResult(result, "CreateRootSignature (shadow)")) return false;
 
 	return true;
 }
@@ -332,6 +379,8 @@ bool GltfRenderer::CreateGraphicsPipeline()
 	if (!CheckResult(result, "CreateGraphicsPipelineState (outline)")) return false;
 
 	// -- 影用 --
+	gpipeline.pRootSignature = _shadowRootSignature.Get();
+
 	gpipeline.VS.pShaderBytecode = _shadowVsBlob->GetBufferPointer();
 	gpipeline.VS.BytecodeLength = _shadowVsBlob->GetBufferSize();
 
@@ -360,5 +409,15 @@ void GltfRenderer::BeforeDraw()
 	cmdList->SetGraphicsRootSignature(_rootSignature.Get());
 
 	// プリミティブトポロジの設定
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+void GltfRenderer::BeforeShadowDraw()
+{
+	auto cmdList = _dx12.CommandList();
+
+	// 影パスは全アクターで PSO もルートシグネチャも同じなので、1 回だけ設定する
+	cmdList->SetGraphicsRootSignature(_shadowRootSignature.Get());
+	cmdList->SetPipelineState(_shadowPipelineState.Get());
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }

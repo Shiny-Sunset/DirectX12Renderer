@@ -36,7 +36,7 @@ bool PMDRenderer::CompileShaders()
 		nullptr,	// defineは無し
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
 		"BasicVS", "vs_5_0",	// 関数は BasicVS、対象シェーダーは vs_5_0
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+		ShaderCompileFlags,
 		0,
 		&_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
 	);
@@ -50,7 +50,7 @@ bool PMDRenderer::CompileShaders()
 		nullptr,	// defineは無し
 		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
 		"BasicPS", "ps_5_0",	// 関数は BasicPS、対象シェーダーは ps_5_0
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,	// デバッグ用及び最適化なし
+		ShaderCompileFlags,
 		0,
 		&_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
 	);

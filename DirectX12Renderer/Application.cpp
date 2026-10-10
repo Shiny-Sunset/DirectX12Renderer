@@ -59,7 +59,6 @@ namespace
 	constexpr DirectX::XMFLOAT3 PlayerSpawn = { -2.0f, 0.0f, 0.0f };
 
 	constexpr DirectX::XMFLOAT3 KingPosition = { 0.0f, 0.0f, 0.0f };
-	constexpr float KingScale = 2.0f;
 }
 
 Application& Application::Instance()
@@ -176,7 +175,6 @@ bool Application::Init()
 	_gltfActors.push_back(std::move(playerActor));
 
 	auto playerCtrl = std::make_unique<CharacterController>(*_gltfActors.back());
-	playerCtrl->SetPushWeight(5.0f);
 	_ownedControllers.push_back(std::move(playerCtrl));
 
 	_player = _gltfActors[0].get();
@@ -192,14 +190,14 @@ bool Application::Init()
 	auto kingCtrl = std::make_unique<CharacterController>(*_gltfActors.back());
 	_ownedControllers.push_back(std::move(kingCtrl));
 
-	_king = std::make_unique<King>(*_gltfActors.back(), *_ownedControllers.back(), KingScale);
+	_king = std::make_unique<King>(*_gltfActors.back(), *_ownedControllers.back(), GameConfig::King::Scale);
 
 	// -- 敵 --
 	_enemyPool = std::make_unique<EnemyPool>(*_dx12, *_gltfRenderer, *_antModel);
-	if (!_enemyPool->Init(30)) return false;
+	if (!_enemyPool->Init(GameConfig::Spawn::PoolSize)) return false;
 
 	// 四隅の巣穴
-	constexpr float D = 12.0f;
+	constexpr float D = GameConfig::Spawn::NestDistance;
 	_spawners.emplace_back(DirectX::XMFLOAT3{ -D, 0.0f, -D });
 	_spawners.emplace_back(DirectX::XMFLOAT3{ D, 0.0f, -D });
 	_spawners.emplace_back(DirectX::XMFLOAT3{ -D, 0.0f,  D });
@@ -243,6 +241,8 @@ void Application::Run()
 	_timer.Reset();
 	while (true)
 	{
+		_dx12->BeginFrame();
+
 		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
@@ -329,10 +329,6 @@ void Application::Run()
 				}
 			}
 
-			for (auto& actor : _gltfActors) actor->Update(dt);	// 実際に動かす
-			_enemyPool->UpdateActors(dt);
-			//_pmdActor->Update();
-
 			_dx12->UpdateLightCamera(_player->Position());
 
 			if (!_debugUI->WantCaptureMouse())
@@ -358,6 +354,11 @@ void Application::Run()
 
 			_dx12->SetCamera(eye, target, 0.1f, 100.0f);
 		}
+
+		const float animDt = (_gameState == GameState::Playing) ? dt : 0.0f;
+		for (auto& actor : _gltfActors) actor->Update(animDt);	// 実際に動かす
+		_enemyPool->UpdateActors(animDt);
+		//_pmdActor->Update();
 		
 
 		// -- デバッグ UI の組み立て --
@@ -373,6 +374,7 @@ void Application::Run()
 		// -- 描画処理 --
 		// -- 0 パス目：影 --
 		_dx12->BeginShadowPass();
+		_gltfRenderer->BeforeShadowDraw();
 		for (auto& actor : _gltfActors) actor->DrawShadow();
 		_enemyPool->DrawShadow();
 		_stage->DrawShadow();
@@ -401,6 +403,7 @@ void Application::Run()
 
 void Application::Terminate()
 {
+	_dx12->WaitForGpuIdle();
 	// COM / D3D12 オブジェクトの解放を main() の中で終わらせておく
 	// (宣言順の逆に破棄されるが、依存関係が分かるように明示的に並べる)
 	_allControllers.clear();
@@ -576,7 +579,8 @@ void Application::BuildDebugUI()
 	float radius = _playerController->Radius();
 	if (ImGui::SliderFloat("Radius", &radius, 0.1f, 1.5f))
 	{
-		for (auto& c : _ownedControllers) c->SetRadius(radius);
+		// 王の半径は King::SetScale が拡大率と連動させているので触らない
+		_playerController->SetRadius(radius);
 	}
 
 	// プレイヤーと 2 体目の距離

@@ -159,6 +159,8 @@ void Player::UpdateMove(float deltaTime, const Input& input, float cameraYaw, bo
 	{
 		// カメラの向きを基準に、ワールドでの進行方向を作る
 		const DirectX::XMFLOAT3 forward = { sinf(cameraYaw), 0.0f, cosf(cameraYaw) };
+		// cross(up, forward) の展開。up = (0,1,0) で forward.y = 0 なので、
+		// 外積の 9 項のうち 7 項が消えて (fz, 0, -fx) になる
 		const DirectX::XMFLOAT3 right = { forward.z, 0.0f, -forward.x };
 
 		DirectX::XMVECTOR dir = DirectX::XMVectorAdd(

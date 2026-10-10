@@ -43,9 +43,6 @@ namespace
 		}
 	}
 
-	// モデルの正面がワールドの -Z を向いているため、+Z を向くように補正する
-	// (glTF は右手系なので、読み込み時に Z を反転している都合による)
-	constexpr float ModelYawOffset = DirectX::XM_PI;
 }
 
 GltfModel::GltfModel(Dx12Wrapper& dx12): _dx12(dx12)

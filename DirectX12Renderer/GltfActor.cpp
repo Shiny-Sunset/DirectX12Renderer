@@ -92,7 +92,7 @@ void GltfActor::Update(float deltaTime)
 
 void GltfActor::UpdateWorldMatrix()
 {
-	_mappedTransform->world =
+	Transform()->world =
 		DirectX::XMMatrixScaling(_scale, _scale, _scale)
 		* DirectX::XMMatrixRotationY(_rotationY + ModelYawOffset)
 		* DirectX::XMMatrixTranslation(_position.x, _position.y, _position.z);
@@ -115,12 +115,13 @@ void GltfActor::Draw()
 	// ヒープの先頭ハンドル(0 番 = シーン用の定数バッファ)
 	auto heapH = _descHeap->GetGPUDescriptorHandleForHeapStart();
 
-	// ルートパラメーター 0 番に行列(b0)を関連付ける
 	auto handle = heapH;
-	cmdList->SetGraphicsRootDescriptorTable(0, handle);
+	// ルートパラメーター 0 番にシーン定数 b0
+	cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
+	// ルートパラメーター 1 番にアクターの行列 b1
+	cmdList->SetGraphicsRootConstantBufferView(1, TransformAddress());
 
-	handle.ptr += incSize * 2;                            // [2] がシャドウマップ
-	cmdList->SetGraphicsRootDescriptorTable(2, handle);
+	cmdList->SetGraphicsRootDescriptorTable(3, heapH);                        // [0] シャドウ
 
 	// 頂点バッファの設定
 	cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
@@ -135,6 +136,9 @@ void GltfActor::Draw()
 	if (_outlineEnabled)
 	{
 		cmdList->SetPipelineState(_renderer.OutlinePipelineState());
+		handle = heapH;
+		handle.ptr += incSize;   // [1] = 最初のマテリアル
+		cmdList->SetGraphicsRootDescriptorTable(2, handle);
 		for (const auto& p : _model.Primitives())
 		{
 			if (p.isBlend) continue;
@@ -149,12 +153,12 @@ void GltfActor::Draw()
 	cmdList->SetPipelineState(_renderer.PipelineState());
 	for (const auto& p : _model.Primitives())
 	{
-		if (p.isBlend) continue;        // ← この行が抜けている
+		if (p.isBlend) continue;        // 半透明は 2 周目で描く
 
 		auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
 		handle = heapH;
-		handle.ptr += incSize * (3 + matIdx * GltfModel::DescriptorsPerMaterial);
-		cmdList->SetGraphicsRootDescriptorTable(1, handle);
+		handle.ptr += incSize * (1 + matIdx * GltfModel::DescriptorsPerMaterial);
+		cmdList->SetGraphicsRootDescriptorTable(2, handle);
 
 		cmdList->DrawIndexedInstanced(
 			p.indexCount, 1, p.startIndexLocation, p.baseVertexLocation, 0
@@ -169,8 +173,8 @@ void GltfActor::Draw()
 
 		auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
 		handle = heapH;
-		handle.ptr += incSize * (3 + matIdx * GltfModel::DescriptorsPerMaterial);
-		cmdList->SetGraphicsRootDescriptorTable(1, handle);
+		handle.ptr += incSize * (1 + matIdx * GltfModel::DescriptorsPerMaterial);
+		cmdList->SetGraphicsRootDescriptorTable(2, handle);
 
 		cmdList->DrawIndexedInstanced(
 			p.indexCount, 1, p.startIndexLocation, p.baseVertexLocation, 0
@@ -183,16 +187,10 @@ void GltfActor::DrawShadow()
 	if (!_visible) return;
 	auto cmdList = _dx12.CommandList();
 
-	cmdList->SetPipelineState(_renderer.ShadowPipelineState());
-	cmdList->SetGraphicsRootSignature(_renderer.RootSignature());
-
-	ID3D12DescriptorHeap* heaps[] = { _descHeap.Get() };
-	cmdList->SetDescriptorHeaps(1, heaps);
-
 	// b0(シーン) と b1(ボーン) だけ渡す。マテリアルとテクスチャは要らない
-	cmdList->SetGraphicsRootDescriptorTable(0, _descHeap->GetGPUDescriptorHandleForHeapStart());
+	cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
+	cmdList->SetGraphicsRootConstantBufferView(1, TransformAddress());
 
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
 	cmdList->IASetIndexBuffer(&_model.IndexBufferView());
 
@@ -214,8 +212,8 @@ bool GltfActor::CreateMaterialAndTextureView()
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
-	// 先頭はシーン用の定数バッファ(b0)、続いてボーン行列(b1)、それ以降がマテリアル(b2)
-	descHeapDesc.NumDescriptors = static_cast<UINT>(_model.MaterialCount()) * GltfModel::DescriptorsPerMaterial + 3;
+	// 先頭はシーン定数(b0)、続いてアクターの行列(b1)、それ以降がマテリアル(b2)とテクスチャ(t0) + シャドウマップ(t1)
+	descHeapDesc.NumDescriptors = static_cast<UINT>(_model.MaterialCount()) * GltfModel::DescriptorsPerMaterial + 1;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
 	auto result = device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&_descHeap));
@@ -242,22 +240,12 @@ bool GltfActor::CreateMaterialAndTextureView()
 
 	auto handle = descHeapH;
 
-	// 先頭(0 番)にシーン用の定数バッファビュー(b0)を作る
-	_dx12.CreateSceneConstantBufferView(descHeapH);
-	handle.ptr += incSize;
-
-	// [1] ボーン行列用の定数バッファビュー(b1)
-	D3D12_CONSTANT_BUFFER_VIEW_DESC transformCBVDesc = {};
-	transformCBVDesc.BufferLocation = _transformBuff->GetGPUVirtualAddress();
-	transformCBVDesc.SizeInBytes = static_cast<UINT>(_transformBuff->GetDesc().Width);
-	device->CreateConstantBufferView(&transformCBVDesc, handle);
-	handle.ptr += incSize;
-
-	// [2] シャドウマップ用のSRV(t1)
+	// [0] シャドウマップ用の SRV(t1)
+	// b0(シーン) と b1(アクターの行列) はルート CBV で直接渡すので、ヒープには載せない
 	_dx12.CreateShadowMapView(handle);
 	handle.ptr += incSize;
 
-	// [3] 以降にマテリアルの定数バッファビュー(b2)をマテリアル数ぶん並べる
+	// [1] 以降にマテリアルの定数バッファビュー(b2)とテクスチャ(t0)を並べる
 	// テクスチャが指定されていないマテリアルには、既定の白テクスチャを割り当てる
 	for (UINT i = 0; i < materialNum; ++i)
 	{
@@ -289,10 +277,8 @@ bool GltfActor::CreateTransformBuffer()
 	D3D12_RESOURCE_DESC transformResDesc = {};
 
 	transformResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	transformResDesc.Width = AlignmentedSize(
-		sizeof(TransformBufferData),
-		D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT
-	);
+	_transformStride = static_cast<UINT>(AlignmentedSize(sizeof(TransformBufferData), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+	transformResDesc.Width = _transformStride * Dx12Wrapper::FrameCount;
 	transformResDesc.Height = 1;                          // 必ず 1
 	transformResDesc.DepthOrArraySize = 1;                // 必ず 1
 	transformResDesc.MipLevels = 1;                       // 必ず 1
@@ -313,16 +299,21 @@ bool GltfActor::CreateTransformBuffer()
 	if (!CheckResult(result, "CreateCommittedResource _transformBuff")) return false;
 
 	// 毎フレーム書き換えるので、マップしたままにしておく(Unmap はデストラクタで行う)
-	result = _transformBuff->Map(0, nullptr, (void**)&_mappedTransform);
+	result = _transformBuff->Map(0, nullptr, reinterpret_cast<void**>(&_mappedTransform));
 	if (!CheckResult(result, "_transformBuff->Map")) return false;
 
 	// 使っていない分を触っても壊れないよう、全体を単位行列で埋めてから流し込む
-	_mappedTransform->world = DirectX::XMMatrixIdentity();
-	std::fill_n(_mappedTransform->bones, GltfModel::MaxBoneCount, DirectX::XMMatrixIdentity());
-	std::copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform->bones);
+	for (UINT i = 0; i < Dx12Wrapper::FrameCount; ++i)
+	{
+		auto* t = reinterpret_cast<TransformBufferData*>(_mappedTransform + i * _transformStride);
+		t->world = DirectX::XMMatrixIdentity();
+		std::fill_n(t->bones, GltfModel::MaxBoneCount, DirectX::XMMatrixIdentity());
+		std::copy(_boneMatrices.begin(), _boneMatrices.end(), t->bones);
+	}
 
 	return true;
 }
+
 
 void GltfActor::UpdateBoneMatrices()
 {
@@ -346,8 +337,8 @@ void GltfActor::UpdateBoneMatrices()
 	}
 
 	// GPU へ
-	std::fill_n(_mappedTransform->bones, GltfModel::MaxBoneCount, DirectX::XMMatrixIdentity());
-	std::copy(_boneMatrices.begin(), _boneMatrices.end(), _mappedTransform->bones);
+	std::fill_n(Transform()->bones, GltfModel::MaxBoneCount, DirectX::XMMatrixIdentity());
+	std::copy(_boneMatrices.begin(), _boneMatrices.end(), Transform()->bones);
 
 #ifdef _DEBUG
 	static bool logged = false;
@@ -494,4 +485,15 @@ void GltfActor::StopAnimation()
 	// バインドポーズへ戻す
 	_animNodes = _model.Nodes();
 	UpdateBoneMatrices();
+}
+
+GltfActor::TransformBufferData* GltfActor::Transform()
+{
+	return reinterpret_cast<TransformBufferData*>(
+		_mappedTransform + _dx12.FrameIndex() * _transformStride);
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS GltfActor::TransformAddress() const
+{
+	return _transformBuff->GetGPUVirtualAddress() + _dx12.FrameIndex() * _transformStride;
 }
