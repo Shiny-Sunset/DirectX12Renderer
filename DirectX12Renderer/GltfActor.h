@@ -30,6 +30,8 @@ public:
     // アニメーションを進め、ボーン行列とワールド行列を GPU へ送る
     void Update(float deltaTime);
 
+    const GltfModel& Model() const { return _model; }
+
     // 描画（GltfRenderer::BeforeDraw() の後に呼ぶ）
     void Draw();
 
@@ -87,7 +89,6 @@ private:
 
     // -- 初期化のサブルーチン --
     bool CreateTransformBuffer();          // ワールド行列とボーン行列の定数バッファ(b1)
-    bool CreateMaterialAndTextureView();   // ディスクリプタヒープとビューを作る
 
     // -- 毎フレームの内部処理 --
     void UpdateBoneMatrices();   // 現在のポーズから _boneMatrices を作り直して GPU へ送る
@@ -133,7 +134,6 @@ private:
     // -- GPU リソース --
     ComPtr<ID3D12Resource> _transformBuff;
     uint8_t* _mappedTransform = nullptr;   // マップしたまま保持
-    ComPtr<ID3D12DescriptorHeap> _descHeap;
     UINT _transformStride = 0;
     TransformBufferData* Transform();
     D3D12_GPU_VIRTUAL_ADDRESS TransformAddress() const;

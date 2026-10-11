@@ -86,6 +86,17 @@ public:
     const D3D12_INDEX_BUFFER_VIEW& IndexBufferView() const { return _ibView; }
     const std::vector<Primitive>& Primitives() const { return _primitives; }
 
+    // 描画に使うディスクリプタヒープ。
+    // b0/b1 をルート CBV にしたので中身はモデルにしか依存せず、
+    // 同じモデルを使うアクターは全員これを共有できる
+    ID3D12DescriptorHeap* DescriptorHeap() const { return _descHeap.Get(); }
+
+    // [0] シャドウマップ（t1）
+    D3D12_GPU_DESCRIPTOR_HANDLE ShadowHandle() const;
+
+    // [1 + i*2] マテリアル i の CBV + テクスチャ SRV
+    D3D12_GPU_DESCRIPTOR_HANDLE MaterialHandle(int materialIndex) const;
+
     // -- マテリアル（アクターがビューを作るのに使う） --
     size_t MaterialCount() const { return _materials.size(); }
     ID3D12Resource* MaterialBuffer() const { return _materialBuff.Get(); }
@@ -114,6 +125,8 @@ private:
     );
     bool CreateMaterialBuffer();                        // 定数バッファを作る
 
+    bool CreateDescriptorHeap();   // ディスクリプタヒープとビューを作る
+
     bool LoadMaterials(const cgltf_data* data);        // マテリアルとテクスチャを読む
 
     bool LoadNodesAndSkin(const cgltf_data* data);   // ノード階層とスキンを読む
@@ -126,6 +139,8 @@ private:
 
     ComPtr<ID3D12Resource> _vertBuff;
     ComPtr<ID3D12Resource> _idxBuff;
+    ComPtr<ID3D12DescriptorHeap> _descHeap;
+    UINT _descIncSize = 0;
     D3D12_VERTEX_BUFFER_VIEW _vbView = {};
     D3D12_INDEX_BUFFER_VIEW _ibView = {};
 

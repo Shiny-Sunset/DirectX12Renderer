@@ -4,6 +4,7 @@
 #include <wrl.h>
 
 class Dx12Wrapper;
+class GltfModel;
 
 // GLB モデルを描画するためのパイプライン(ルートシグネチャ、シェーダー、
 // パイプラインステート)を受け持つクラス
@@ -20,6 +21,8 @@ public:
 	// 初期化(ルートシグネチャとパイプラインステートの作成)
 	// @return 成功したら true
 	bool Init();
+
+	void SetModelHeap(const GltfModel& model);
 
 	// 描画前に、モデル間で共通の状態を設定する
 	void BeforeDraw();

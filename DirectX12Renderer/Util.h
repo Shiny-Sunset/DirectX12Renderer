@@ -5,6 +5,7 @@
 #include <utility>
 #include <d3d12.h>
 #include <d3dcompiler.h>
+#include <chrono>
 
 // シェーダーをコンパイルするときのオプション
 // Debug ではシェーダーデバッガで追えるように最適化を切り、Release では最適化する。
@@ -56,3 +57,26 @@ std::string GetTexturePathFromModelAndTexPath(const std::string& modelPath, cons
 // @param str マルチバイト文字列
 // @return 変換されたワイド文字列
 std::wstring GetWideStringFromString(const std::string& str);
+
+// 生存期間を測って、渡された変数へ ms で書き出す
+// 使い方:  { ScopedTimer t(_msCollision);  ResolveCollisions(); }
+class ScopedTimer
+{
+public:
+    explicit ScopedTimer(float& outMs)
+        : _out(outMs), _start(std::chrono::steady_clock::now()) {
+    }
+
+    ~ScopedTimer()
+    {
+        _out = std::chrono::duration<float, std::milli>(
+            std::chrono::steady_clock::now() - _start).count();
+    }
+
+    ScopedTimer(const ScopedTimer&) = delete;
+    ScopedTimer& operator=(const ScopedTimer&) = delete;
+
+private:
+    float& _out;
+    std::chrono::steady_clock::time_point _start;
+};

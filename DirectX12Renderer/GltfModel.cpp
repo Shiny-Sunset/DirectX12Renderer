@@ -56,6 +56,7 @@ bool GltfModel::Init(const std::string& modelPath)
 	if (!LoadGltfFile(modelPath, vertices, indices)) return false;
 	if (!CreateVertexAndIndexBuffer(vertices, indices)) return false;
 	if (!CreateMaterialBuffer()) return false;
+	if (!CreateDescriptorHeap()) return false;
 
 	return true;
 }
@@ -582,4 +583,77 @@ bool GltfModel::CreateMaterialBuffer()
 	_materialBuff->Unmap(0, nullptr);
 
 	return true;
+}
+
+bool GltfModel::CreateDescriptorHeap()
+{
+	auto device = _dx12.Device();
+	auto materialNum = static_cast<UINT>(_materials.size());
+
+	// ディスクリプタヒープの作成
+	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	descHeapDesc.NodeMask = 0;
+	// 先頭はシーン定数(b0)、続いてアクターの行列(b1)、それ以降がマテリアル(b2)とテクスチャ(t0) + シャドウマップ(t1)
+	descHeapDesc.NumDescriptors = static_cast<UINT>(_materials.size()) * GltfModel::DescriptorsPerMaterial + 1;
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	auto result = device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&_descHeap));
+	if (!CheckResult(result, "CreateDescriptorHeap _descHeap")) return false;
+
+	// 通常テクスチャビュー作成
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+
+	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;	// デフォルト
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;	// 2D テクスチャ
+	srvDesc.Texture2D.MipLevels = 1;	// ミップマップは使用しないので 1
+
+	// ビューの作成
+	D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
+
+	matCBVDesc.BufferLocation = _materialBuff.Get()->GetGPUVirtualAddress();	// バッファアドレス
+	matCBVDesc.SizeInBytes = static_cast<UINT>(_materialBuffSize);	// マテリアルバッファサイズ
+
+	// ディスクリプタヒープの先頭を記録
+	auto descHeapH = _descHeap->GetCPUDescriptorHandleForHeapStart();
+
+	_descIncSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	auto handle = descHeapH;
+
+	// [0] シャドウマップ用の SRV(t1)
+	// b0(シーン) と b1(アクターの行列) はルート CBV で直接渡すので、ヒープには載せない
+	_dx12.CreateShadowMapView(handle);
+	handle.ptr += _descIncSize;
+
+	// [1] 以降にマテリアルの定数バッファビュー(b2)とテクスチャ(t0)を並べる
+	// テクスチャが指定されていないマテリアルには、既定の白テクスチャを割り当てる
+	for (UINT i = 0; i < materialNum; ++i)
+	{
+		// マテリアル用CBV
+		device->CreateConstantBufferView(&matCBVDesc, handle);
+		handle.ptr += _descIncSize;
+		matCBVDesc.BufferLocation += _materialBuffSize;
+
+		// テクスチャ用のSRV
+		auto tex = _materialTextures[i].Get() != nullptr ? _materialTextures[i].Get() : _dx12.WhiteTexture();
+		srvDesc.Format = tex->GetDesc().Format;
+		device->CreateShaderResourceView(tex, &srvDesc, handle);
+		handle.ptr += _descIncSize;
+	}
+
+	return true;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE GltfModel::ShadowHandle() const
+{
+	return _descHeap->GetGPUDescriptorHandleForHeapStart();
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE GltfModel::MaterialHandle(int materialIndex) const
+{
+	auto h = _descHeap->GetGPUDescriptorHandleForHeapStart();
+	h.ptr += _descIncSize * (1 + static_cast<SIZE_T>(materialIndex) * DescriptorsPerMaterial);
+	return h;
 }

@@ -36,7 +36,6 @@ bool GltfActor::Init()
 	_animNodes = _model.Nodes();
 	_blendNodes = _model.Nodes();
 	UpdateBoneMatrices();
-	if (!CreateMaterialAndTextureView()) return false;
 
 	return true;
 }
@@ -102,26 +101,12 @@ void GltfActor::Draw()
 {
 	if (!_visible) return;
 	auto cmdList = _dx12.CommandList();
-
-	// ディスクリプタヒープの指定
-	// CBV_SRV_UAV のヒープは同時に 1 本しかバインドできない
-	// (切り替えると、それ以前に設定したディスクリプタテーブルは無効になる)
-	// ComPtr の operator& は中身を Release してしまうため、必ず Get() を使うこと
-	ID3D12DescriptorHeap* heaps[] = { _descHeap.Get() };
-	cmdList->SetDescriptorHeaps(1, heaps);
-
-	auto incSize = _dx12.Device()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	// ヒープの先頭ハンドル(0 番 = シーン用の定数バッファ)
-	auto heapH = _descHeap->GetGPUDescriptorHandleForHeapStart();
-
-	auto handle = heapH;
 	// ルートパラメーター 0 番にシーン定数 b0
 	cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
 	// ルートパラメーター 1 番にアクターの行列 b1
 	cmdList->SetGraphicsRootConstantBufferView(1, TransformAddress());
 
-	cmdList->SetGraphicsRootDescriptorTable(3, heapH);                        // [0] シャドウ
+	cmdList->SetGraphicsRootDescriptorTable(3, _model.ShadowHandle());	// [0] シャドウ
 
 	// 頂点バッファの設定
 	cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
@@ -136,9 +121,7 @@ void GltfActor::Draw()
 	if (_outlineEnabled)
 	{
 		cmdList->SetPipelineState(_renderer.OutlinePipelineState());
-		handle = heapH;
-		handle.ptr += incSize;   // [1] = 最初のマテリアル
-		cmdList->SetGraphicsRootDescriptorTable(2, handle);
+		cmdList->SetGraphicsRootDescriptorTable(2, _model.MaterialHandle(0));
 		for (const auto& p : _model.Primitives())
 		{
 			if (p.isBlend) continue;
@@ -156,9 +139,7 @@ void GltfActor::Draw()
 		if (p.isBlend) continue;        // 半透明は 2 周目で描く
 
 		auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
-		handle = heapH;
-		handle.ptr += incSize * (1 + matIdx * GltfModel::DescriptorsPerMaterial);
-		cmdList->SetGraphicsRootDescriptorTable(2, handle);
+		cmdList->SetGraphicsRootDescriptorTable(2, _model.MaterialHandle(matIdx));
 
 		cmdList->DrawIndexedInstanced(
 			p.indexCount, 1, p.startIndexLocation, p.baseVertexLocation, 0
@@ -172,9 +153,7 @@ void GltfActor::Draw()
 		if (!p.isBlend) continue;
 
 		auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
-		handle = heapH;
-		handle.ptr += incSize * (1 + matIdx * GltfModel::DescriptorsPerMaterial);
-		cmdList->SetGraphicsRootDescriptorTable(2, handle);
+		cmdList->SetGraphicsRootDescriptorTable(2, _model.MaterialHandle(matIdx));
 
 		cmdList->DrawIndexedInstanced(
 			p.indexCount, 1, p.startIndexLocation, p.baseVertexLocation, 0
@@ -202,67 +181,6 @@ void GltfActor::DrawShadow()
 	}
 }
 
-
-bool GltfActor::CreateMaterialAndTextureView()
-{
-	auto device = _dx12.Device();
-	auto materialNum = static_cast<UINT>(_model.MaterialCount());
-
-	// ディスクリプタヒープの作成
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	descHeapDesc.NodeMask = 0;
-	// 先頭はシーン定数(b0)、続いてアクターの行列(b1)、それ以降がマテリアル(b2)とテクスチャ(t0) + シャドウマップ(t1)
-	descHeapDesc.NumDescriptors = static_cast<UINT>(_model.MaterialCount()) * GltfModel::DescriptorsPerMaterial + 1;
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-
-	auto result = device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&_descHeap));
-	if (!CheckResult(result, "CreateDescriptorHeap _descHeap")) return false;
-
-	// 通常テクスチャビュー作成
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-
-	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;	// デフォルト
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;	// 2D テクスチャ
-	srvDesc.Texture2D.MipLevels = 1;	// ミップマップは使用しないので 1
-
-	// ビューの作成
-	D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
-
-	matCBVDesc.BufferLocation = _model.MaterialBuffer()->GetGPUVirtualAddress();	// バッファアドレス
-	matCBVDesc.SizeInBytes = static_cast<UINT>(_model.MaterialStride());	// マテリアルバッファサイズ
-
-	// ディスクリプタヒープの先頭を記録
-	auto descHeapH = _descHeap->GetCPUDescriptorHandleForHeapStart();
-
-	auto incSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	auto handle = descHeapH;
-
-	// [0] シャドウマップ用の SRV(t1)
-	// b0(シーン) と b1(アクターの行列) はルート CBV で直接渡すので、ヒープには載せない
-	_dx12.CreateShadowMapView(handle);
-	handle.ptr += incSize;
-
-	// [1] 以降にマテリアルの定数バッファビュー(b2)とテクスチャ(t0)を並べる
-	// テクスチャが指定されていないマテリアルには、既定の白テクスチャを割り当てる
-	for (UINT i = 0; i < materialNum; ++i)
-	{
-		// マテリアル用CBV
-		device->CreateConstantBufferView(&matCBVDesc, handle);
-		handle.ptr += incSize;
-		matCBVDesc.BufferLocation += _model.MaterialStride();
-
-		// テクスチャ用のSRV
-		auto tex = _model.MaterialTexture(i) != nullptr ? _model.MaterialTexture(i) : _dx12.WhiteTexture();
-		srvDesc.Format = tex->GetDesc().Format;
-		device->CreateShaderResourceView(tex, &srvDesc, handle);
-		handle.ptr += incSize;
-	}
-
-	return true;
-}
 
 bool GltfActor::CreateTransformBuffer()
 {
@@ -337,7 +255,6 @@ void GltfActor::UpdateBoneMatrices()
 	}
 
 	// GPU へ
-	std::fill_n(Transform()->bones, GltfModel::MaxBoneCount, DirectX::XMMatrixIdentity());
 	std::copy(_boneMatrices.begin(), _boneMatrices.end(), Transform()->bones);
 
 #ifdef _DEBUG

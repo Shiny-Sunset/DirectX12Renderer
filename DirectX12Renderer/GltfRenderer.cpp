@@ -1,8 +1,7 @@
 ﻿#include "GltfRenderer.h"
-
 #include "Dx12Wrapper.h"
 #include "Util.h"
-
+#include "GltfModel.h"
 #include <d3dcompiler.h>
 #include <algorithm>
 #include <iostream>
@@ -25,6 +24,12 @@ bool GltfRenderer::Init()
 	if (!CreateGraphicsPipeline()) return false;
 
 	return true;
+}
+
+void GltfRenderer::SetModelHeap(const GltfModel& model)
+{
+	ID3D12DescriptorHeap* heaps[] = { model.DescriptorHeap() };
+	_dx12.CommandList()->SetDescriptorHeaps(1, heaps);
 }
 
 bool GltfRenderer::CompileShaders()

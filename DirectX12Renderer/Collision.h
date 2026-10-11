@@ -1,5 +1,8 @@
 ﻿#pragma once
 #include <DirectXMath.h>
+#include <vector>
+
+class CharacterController;
 
 // 当たり判定用の球
 struct Sphere
@@ -32,3 +35,24 @@ bool ResolveXZ(const Sphere& a, const Sphere& b, float& outPushX, float& outPush
 // @param outPush 球を押し出す量（3 軸）
 // @return 重なっていて押し出しが必要なら true
 bool ResolveSphereVsAABB(const Sphere& s, const AABB& b, DirectX::XMFLOAT3& outPush);
+
+// XZ 平面を等間隔のマスに区切り、近くにいるものだけを総当たりする
+// セルサイズを「最大半径の 2 倍」にすることで、
+// 重なっている 2 つは必ず 3x3 の範囲に収まる
+class CollisionGrid
+{
+public:
+    static constexpr float CellSize = 2.8f;   // 最大半径 1.4m の 2 倍
+    static constexpr int   GridSize = 20;     // 20 × 20 マス = ±28m をカバー
+
+    // 判定に参加するものだけを登録し直す（反復ごとに呼ぶ）
+    void Build(const std::vector<CharacterController*>& controllers);
+
+    // i 番の周囲 3x3 マスにいて、添字が i より大きいものを out に積む
+    void GatherCandidates(size_t i, const DirectX::XMFLOAT3& pos, std::vector<int>& out) const;
+
+private:
+    int ToCell(float v) const;   // ワールド座標 → マス番号（範囲外はクランプ）
+
+    std::vector<int> _cells[GridSize][GridSize];
+};

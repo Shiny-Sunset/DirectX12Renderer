@@ -41,6 +41,12 @@ public:
 
     int AliveCount() const;
 
+    // 同時に使ってよい数の上限を変える。
+    // 下げたときは、はみ出した分をその場で片付ける
+    void SetActiveLimit(size_t n);
+    size_t ActiveLimit() const { return _activeLimit; }
+    size_t Capacity() const { return _enemies.size(); }
+
     // 当たり判定の登録用。Application が持つ配列へ追加してもらう
     const std::vector<std::unique_ptr<CharacterController>>& Controllers() const { return _controllers; }
 
@@ -58,4 +64,6 @@ private:
     std::vector<std::unique_ptr<CharacterController>> _controllers;
     std::vector<std::unique_ptr<Enemy>> _enemies;
     std::vector<bool> _active;   // 使用中かどうか
+
+    size_t _activeLimit = 0;
 };

@@ -8,6 +8,7 @@
 #include "Input.h"
 #include "Camera.h"
 #include "GameConfig.h"
+#include "Collision.h"
 
 class Dx12Wrapper;
 class PMDRenderer;
@@ -103,8 +104,10 @@ private:
 #endif
 	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
 	void BuildDebugUI();
-
+	void BuildProfileUI();
 	void BuildGameUI();
+
+	void UpdateProfileAverages();
 
 	// -- ウィンドウ --
 	WNDCLASSEX _windowClass = {};
@@ -156,5 +159,20 @@ private:
 	int _killCount = 0;           // 討伐数（スコア）
 	int _highScore = 0;
 
-	GameConfig::Tuning _tuning;
+	CollisionGrid _collisionGrid;
+	std::vector<int> _candidates;
+
+	GameConfig::Tuning _tuning; 
+
+	// 計測値
+	float _msGpuWait = 0.0f;   // ★ GPU 待ち
+	float _msAI = 0.0f;   // プレイヤー・敵の判断
+	float _msCollision = 0.0f;   // 当たり判定
+	float _msAnim = 0.0f;   // アニメーションとボーン行列
+	float _msRecord = 0.0f;   // 描画命令の記録
+	float _msCollisionAvg = 0.0f;
+	float _msGpuWaitAvg = 0.0f;
+	float _msAIAvg = 0.0f;
+	float _msAnimAvg = 0.0f;
+	float _msRecordAvg = 0.0f;
 };

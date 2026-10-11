@@ -1,6 +1,54 @@
 ﻿#include "Collision.h"
+#include "CharacterController.h"
 #include <cmath>
 #include <algorithm>
+
+int CollisionGrid::ToCell(float v) const
+{
+    const int c = static_cast<int>((v + GridSize * CellSize * 0.5f) / CellSize);
+    return std::clamp(c, 0, GridSize - 1);   // 範囲外は端のマスへ押し込む
+}
+
+void CollisionGrid::Build(const std::vector<CharacterController*>& controllers)
+{
+    for (auto& row : _cells)
+        for (auto& cell : row)
+            cell.clear();   // 容量は保持される
+
+    for (size_t i = 0; i < controllers.size(); ++i)
+    {
+        // 判定に参加しないものは最初から入れない
+        if (!controllers[i]->IsCollisionEnabled()) continue;
+
+        const auto& p = controllers[i]->Position();
+        _cells[ToCell(p.x)][ToCell(p.z)].push_back(static_cast<int>(i));
+    }
+}
+
+void CollisionGrid::GatherCandidates(size_t i, const DirectX::XMFLOAT3& pos, std::vector<int>& out) const
+{
+    out.clear();
+    const int cx = ToCell(pos.x);
+    const int cz = ToCell(pos.z);
+
+    for (int dz = -1; dz <= 1; ++dz)
+    {
+        const int z = cz + dz;
+        if (z < 0 || z >= GridSize) continue;
+
+        for (int dx = -1; dx <= 1; ++dx)
+        {
+            const int x = cx + dx;
+            if (x < 0 || x >= GridSize) continue;
+
+            for (int j : _cells[x][z])
+            {
+                // 同じ組を 2 回処理しないよう、片側だけ拾う
+                if (j > static_cast<int>(i)) out.push_back(j);
+            }
+        }
+    }
+}
 
 bool Intersects(const Sphere& a, const Sphere& b)
 {

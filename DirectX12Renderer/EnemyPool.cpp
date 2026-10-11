@@ -29,12 +29,13 @@ bool EnemyPool::Init(size_t count)
         _enemies.push_back(std::make_unique<Enemy>(*_actors.back(), *_controllers.back()));
         _active.push_back(false);
     }
+    _activeLimit = count;
     return true;
 }
 
 bool EnemyPool::Spawn(const DirectX::XMFLOAT3& pos, float speedScale)
 {
-    for (size_t i = 0; i < _active.size(); ++i)
+    for (size_t i = 0; i < _activeLimit; ++i)
     {
         if (_active[i]) continue;   // 使用中は飛ばす
 
@@ -76,6 +77,7 @@ void EnemyPool::UpdateActors(float deltaTime)
 
 void EnemyPool::Draw()
 {
+    _renderer.SetModelHeap(_model);
     for (size_t i = 0; i < _actors.size(); ++i)
     {
         if (!_active[i]) continue;
@@ -106,6 +108,21 @@ void EnemyPool::ResetAll()
 {
     for (size_t i = 0; i < _active.size(); ++i)
     {
+        _active[i] = false;
+        _actors[i]->SetVisible(false);
+        _controllers[i]->SetCollisionEnabled(false);
+    }
+}
+
+void EnemyPool::SetActiveLimit(size_t n)
+{
+    _activeLimit = std::min(n, _enemies.size());
+
+    // 上限を下げたとき、範囲外で生きているものを片付ける
+    // （放っておくと、倒されるまで残り続けて数が合わなくなる）
+    for (size_t i = _activeLimit; i < _active.size(); ++i)
+    {
+        if (!_active[i]) continue;
         _active[i] = false;
         _actors[i]->SetVisible(false);
         _controllers[i]->SetCollisionEnabled(false);

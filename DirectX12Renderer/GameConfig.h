@@ -72,7 +72,7 @@ namespace GameConfig
         constexpr float MinInterval = 1.6f;      // 最短の間隔
         constexpr float RampTime = 120.0f;        // この秒数かけて最短まで詰める
         constexpr float NestDistance = 12.0f;    // 巣穴の位置（中心からの距離）
-        constexpr size_t PoolSize = 30;          // 同時に存在できるアリの数
+        constexpr size_t PoolSize = 300;          // 同時に存在できるアリの数
     }
 
     // ------------------------------------------------------------
@@ -88,8 +88,9 @@ namespace GameConfig
     // 定数を何倍にするか、という形で持つ
     struct Tuning
     {
-        float spawnIntervalScale = 1.0f;   // 大きいほどアリが来ない
-        float antSpeedScale = 1.0f;        // 大きいほどアリが速い
-        int kingMaxHP = King::MaxHP;       // 次のリスタートから反映
+        float spawnIntervalScale = 1.0f;    // 大きいほどアリが来ない
+        float antSpeedScale = 1.0f;         // 大きいほどアリが速い
+        int kingMaxHP = King::MaxHP;        // 次のリスタートから反映
+        int enemyLimit = 30;                // 同時に存在できる数（追加・上限は PoolSize）
     };
 }

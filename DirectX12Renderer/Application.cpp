@@ -17,6 +17,7 @@
 #include "Stage.h"
 #include "EnemyPool.h"
 #include "Spawner.h"
+#include "Util.h"
 #include <tchar.h>
 #include <iostream>
 #include <algorithm>
@@ -195,6 +196,7 @@ bool Application::Init()
 	// -- 敵 --
 	_enemyPool = std::make_unique<EnemyPool>(*_dx12, *_gltfRenderer, *_antModel);
 	if (!_enemyPool->Init(GameConfig::Spawn::PoolSize)) return false;
+	_enemyPool->SetActiveLimit(static_cast<size_t>(_tuning.enemyLimit));
 
 	// 四隅の巣穴
 	constexpr float D = GameConfig::Spawn::NestDistance;
@@ -241,7 +243,10 @@ void Application::Run()
 	_timer.Reset();
 	while (true)
 	{
-		_dx12->BeginFrame();
+		{
+			ScopedTimer t(_msGpuWait);
+			_dx12->BeginFrame();
+		}
 
 		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
@@ -288,24 +293,32 @@ void Application::Run()
 		if (_gameState == GameState::Playing)
 		{
 			_survivedTime += dt;
-			_playerLogic->Update(dt, _input, _camera.Yaw(), !_debugUI->WantCaptureKeyboard());
-			_king->Update(dt);
-			for (auto& s : _spawners) s.Update(dt, _survivedTime, *_enemyPool, _tuning);   // 湧く
-			const GameConfig::Enemy::Target kingTarget{ _king->Position(), _king->BodySphere().radius };
-			const GameConfig::Enemy::Target playerTarget{ _player->Position(), _playerController->Radius() };
-			_enemyPool->Update(dt, kingTarget, playerTarget);                            // 判断
-			CheckAttackHits();	// ヒット判定
-			// 床の高さを先に教えてから動かす
-			for (auto& c : _allControllers)
 			{
-				const auto& p = c->Position();   // または既存の取得方法
-				c->SetGroundHeight(_stage->GroundHeightAt(p.x, p.z, p.y + 0.05f));
+				ScopedTimer t(_msAI);
+				_playerLogic->Update(dt, _input, _camera.Yaw(), !_debugUI->WantCaptureKeyboard());
+				_king->Update(dt);
+				for (auto& s : _spawners) s.Update(dt, _survivedTime, *_enemyPool, _tuning);   // 湧く
+				const GameConfig::Enemy::Target kingTarget{ _king->Position(), _king->BodySphere().radius };
+				const GameConfig::Enemy::Target playerTarget{ _player->Position(), _playerController->Radius() };
+				_enemyPool->Update(dt, kingTarget, playerTarget);                            // 判断
+			}			
+			CheckAttackHits();	// ヒット判定
+
+			{
+				ScopedTimer t(_msCollision);
+				// 床の高さを先に教えてから動かす
+				for (auto& c : _allControllers)
+				{
+					const auto& p = c->Position();   // または既存の取得方法
+					c->SetGroundHeight(_stage->GroundHeightAt(p.x, p.z, p.y + 0.05f));
+				}
+				for (auto& c : _allControllers) c->Update(dt);	// コリジョン更新
+				for (auto& c : _allControllers) _stage->Resolve(*c);
+				ResolveCollisions();	// 重なりの解消
+				for (auto& c : _allControllers) _stage->Resolve(*c);
+				for (auto& c : _allControllers) _stage->Unstuck(*c);
 			}
-			for (auto& c : _allControllers) c->Update(dt);	// コリジョン更新
-			for (auto& c : _allControllers) _stage->Resolve(*c);
-			ResolveCollisions();	// 重なりの解消
-			for (auto& c : _allControllers) _stage->Resolve(*c);
-			for (auto& c : _allControllers) _stage->Unstuck(*c);
+
 			// 敵の攻撃が王やプレイヤーに当たっているか
 			for (size_t i = 0; i < _enemyPool->Size(); ++i)
 			{
@@ -356,11 +369,14 @@ void Application::Run()
 		}
 
 		const float animDt = (_gameState == GameState::Playing) ? dt : 0.0f;
-		for (auto& actor : _gltfActors) actor->Update(animDt);	// 実際に動かす
-		_enemyPool->UpdateActors(animDt);
+		{
+			ScopedTimer t(_msAnim);
+			for (auto& actor : _gltfActors) actor->Update(animDt);	// 実際に動かす
+			_enemyPool->UpdateActors(animDt);
+		}
 		//_pmdActor->Update();
 		
-
+		UpdateProfileAverages();
 		// -- デバッグ UI の組み立て --
 		if (_input.IsTriggered(VK_F1))
 		{
@@ -368,36 +384,44 @@ void Application::Run()
 		}
 		_debugUI->BeginFrame();
 		if (_showDebugUI) BuildDebugUI();
+		BuildProfileUI();
 		BuildGameUI();
 		_debugUI->EndFrame();
 
 		// -- 描画処理 --
-		// -- 0 パス目：影 --
-		_dx12->BeginShadowPass();
-		_gltfRenderer->BeforeShadowDraw();
-		for (auto& actor : _gltfActors) actor->DrawShadow();
-		_enemyPool->DrawShadow();
-		_stage->DrawShadow();
-		_dx12->EndShadowPass();
-		
-		// -- 1 パス目：シーンをテクスチャへ --
-		_dx12->BeginOffscreenPass();
-		//_pmdRenderer->BeforeDraw();
-		//_pmdActor->Draw
-		_ground->Draw();
-		_stage->Draw();
-		_gltfRenderer->BeforeDraw();
-		for (auto& actor : _gltfActors) actor->Draw();
-		_enemyPool->Draw();
-		_dx12->EndOffscreenPass();
+		{
+			ScopedTimer t(_msRecord);
+			// -- 0 パス目：影 --
+			_dx12->BeginShadowPass();
+			_gltfRenderer->BeforeShadowDraw();
+			for (auto& actor : _gltfActors) actor->DrawShadow();
+			_enemyPool->DrawShadow();
+			_stage->DrawShadow();
+			_dx12->EndShadowPass();
+
+			// -- 1 パス目：シーンをテクスチャへ --
+			_dx12->BeginOffscreenPass();
+			//_pmdRenderer->BeforeDraw();
+			//_pmdActor->Draw
+			_ground->Draw();
+			_stage->Draw();
+			_gltfRenderer->BeforeDraw();
+			for (auto& actor : _gltfActors)
+			{
+				_gltfRenderer->SetModelHeap(actor->Model());
+				actor->Draw();
+			}
+			_enemyPool->Draw();
+			_dx12->EndOffscreenPass();
 
 
-		// -- 2 パス目：テクスチャを画面へ --
-		_dx12->BeginBackBufferPass();
-		_pera->Draw();        // 画面いっぱいの板ポリ
-		_debugUI->Draw();     // UI は効果の影響を受けない
-		_dx12->EndDraw();
-		_dx12->Flip();
+			// -- 2 パス目：テクスチャを画面へ --
+			_dx12->BeginBackBufferPass();
+			_pera->Draw();        // 画面いっぱいの板ポリ
+			_debugUI->Draw();     // UI は効果の影響を受けない
+			_dx12->EndDraw();
+			_dx12->Flip();
+		}
 	}
 }
 
@@ -453,6 +477,21 @@ void Application::BuildDebugUI()
 
 	ImGui::Separator();
 
+	ImGui::Text("Profile (ms)");
+	ImGui::Text("  GPU wait : %.3f", _msGpuWaitAvg);
+	ImGui::Text("  AI       : %.3f", _msAIAvg);
+	ImGui::Text("  Collision: %.3f", _msCollisionAvg);
+	ImGui::Text("  Anim     : %.3f", _msAnimAvg);
+	ImGui::Text("  Record   : %.3f", _msRecordAvg);
+
+	ImGui::Separator();
+	ImGui::Text("Enemies");
+	ImGui::Text("Alive: %d / %zu", _enemyPool->AliveCount(), _enemyPool->Size());
+	ImGui::Text("Kills: %d", _killCount);
+	ImGui::Text("Time:  %.1f s", _survivedTime);
+
+	ImGui::Separator();
+
 	bool vsync = _dx12->IsVSyncEnabled();
 	if (ImGui::Checkbox("VSync", &vsync))
 	{
@@ -463,7 +502,12 @@ void Application::BuildDebugUI()
 	ImGui::Text("Balance");
 	ImGui::SliderFloat("Spawn Interval", &_tuning.spawnIntervalScale, 0.2f, 3.0f);   // 全体の倍率
 	ImGui::SliderFloat("Ant Speed", &_tuning.antSpeedScale, 0.3f, 2.0f);
-	if (ImGui::SliderInt("King HP", &_tuning.kingMaxHP, 5, 50))
+	if (ImGui::SliderInt("Enemy Limit", &_tuning.enemyLimit,
+		10, static_cast<int>(GameConfig::Spawn::PoolSize)))
+	{
+		_enemyPool->SetActiveLimit(static_cast<size_t>(_tuning.enemyLimit));
+	}
+	if (ImGui::SliderInt("King HP", &_tuning.kingMaxHP, 5, 5000))
 	{
 		_king->SetMaxHP(_tuning.kingMaxHP);
 	}
@@ -595,12 +639,6 @@ void Application::BuildDebugUI()
 	}
 
 	ImGui::Separator();
-	ImGui::Text("Enemies");
-	ImGui::Text("Alive: %d / %zu", _enemyPool->AliveCount(), _enemyPool->Size());
-	ImGui::Text("Kills: %d", _killCount);
-	ImGui::Text("Time:  %.1f s", _survivedTime);
-
-	ImGui::Separator();
 	ImGui::Text("King");
 	ImGui::Text("HP  %d / %d", _king->HP(), _king->MaxHP());
 
@@ -610,6 +648,31 @@ void Application::BuildDebugUI()
 		_king->SetScale(kingScale);
 	}
 	ImGui::NewLine();
+
+	ImGui::End();
+}
+
+void Application::BuildProfileUI()
+{
+	const auto& io = ImGui::GetIO();
+
+	// 画面右上に固定。入力も背景も持たないので、ImGui の負荷を最小にする
+	ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - 10.0f, 10.0f), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+	ImGui::Begin("Profile", nullptr,
+		ImGuiWindowFlags_NoTitleBar
+		| ImGuiWindowFlags_AlwaysAutoResize
+		| ImGuiWindowFlags_NoInputs
+		| ImGuiWindowFlags_NoMove
+		| ImGuiWindowFlags_NoSavedSettings
+		| ImGuiWindowFlags_NoFocusOnAppearing);
+
+	const float cpu = _msAIAvg + _msCollisionAvg + _msAnimAvg + _msRecordAvg;
+
+	ImGui::Text("%.1f FPS (%.2f ms)", io.Framerate, 1000.0f / io.Framerate);
+	ImGui::Text("GPU wait %.3f / CPU %.3f", _msGpuWaitAvg, cpu);
+	ImGui::Text("AI %.3f  Col %.3f", _msAIAvg, _msCollisionAvg);
+	ImGui::Text("Anim %.3f  Rec %.3f", _msAnimAvg, _msRecordAvg);
+	ImGui::Text("Ants %d / %d", _enemyPool->AliveCount(), _tuning.enemyLimit);
 
 	ImGui::End();
 }
@@ -690,29 +753,40 @@ void Application::BuildGameUI()
 	ImGui::End();
 }
 
+void Application::UpdateProfileAverages()
+{
+	constexpr float k = 0.05f;   // 小さいほど滑らか
+	_msGpuWaitAvg = _msGpuWaitAvg * (1.0f - k) + _msGpuWait * k;
+	_msAIAvg = _msAIAvg * (1.0f - k) + _msAI * k;
+	_msCollisionAvg = _msCollisionAvg * (1.0f - k) + _msCollision * k;
+	_msAnimAvg = _msAnimAvg * (1.0f - k) + _msAnim * k;
+	_msRecordAvg = _msRecordAvg * (1.0f - k) + _msRecord * k;
+}
+
 void Application::ResolveCollisions()
 {
 	constexpr int Iterations = 3;
 	for (int iter = 0; iter < Iterations; ++iter)
 	{
-		// 総当たりで調べる
+		_collisionGrid.Build(_allControllers);
+		
 		for (size_t i = 0; i < _allControllers.size(); ++i)
 		{
-			for (size_t j = i + 1; j < _allControllers.size(); ++j)
-			{
-				auto& a = *_allControllers[i];
-				auto& b = *_allControllers[j];
+			auto& a = *_allControllers[i];
+			if (!a.IsCollisionEnabled()) continue;
 
-				// 死んだキャラクターなどは判定しない
-				if (!a.IsCollisionEnabled() || !b.IsCollisionEnabled()) continue;
+			_collisionGrid.GatherCandidates(i, a.Position(), _candidates);
+
+			for (int j : _candidates)
+			{
+				auto& b = *_allControllers[j];
 
 				float pushX = 0.0f, pushZ = 0.0f;
 				if (!ResolveXZ(a.BodySphere(), b.BodySphere(), pushX, pushZ)) continue;
 
 				const float total = a.PushWeight() + b.PushWeight();
-				if (total <= 0.0f) continue;   // 念のため（通常は起きない）
+				if (total <= 0.0f) continue;
 
-				// 重い方が動かない。相手が重いほど、自分がたくさん動く
 				a.PushXZ(pushX * (b.PushWeight() / total), pushZ * (b.PushWeight() / total));
 				b.PushXZ(-pushX * (a.PushWeight() / total), -pushZ * (a.PushWeight() / total));
 			}
