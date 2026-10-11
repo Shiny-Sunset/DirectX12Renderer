@@ -11,12 +11,8 @@ cbuffer SceneBuffer : register(b0)
     float3 _pad1;
 };
 
-cbuffer TransformBuffer : register(b1)
-{
-    matrix world; // 箱ごとに差し替わる（ルート定数で渡される）
-};
-
 Texture2D<float> shadowMap : register(t0); // 深度なので 1 成分
+StructuredBuffer<matrix> g_instances : register(t1); // 箱ごとのワールド行列
 SamplerComparisonState shadowSmp : register(s0);
 
 struct StageOutput

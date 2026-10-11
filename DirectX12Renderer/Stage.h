@@ -36,6 +36,7 @@ private:
 
     bool CompileShaders();
     bool CreateVertexAndIndexBuffer();
+    bool CreateInstanceBuffer();
     bool CreateRootSignature();
     bool CreateShadowRootSignature();
     bool CreatePipelineState();
@@ -66,6 +67,7 @@ private:
     D3D12_VERTEX_BUFFER_VIEW _vbView = {};
     ComPtr<ID3D12Resource> _idxBuff;
     D3D12_INDEX_BUFFER_VIEW _ibView = {};
+    ComPtr<ID3D12Resource> _instanceBuff;
     ComPtr<ID3D12RootSignature> _rootSignature;
     ComPtr<ID3D12RootSignature> _shadowRootSignature;
     ComPtr<ID3D12PipelineState> _pipelineState;

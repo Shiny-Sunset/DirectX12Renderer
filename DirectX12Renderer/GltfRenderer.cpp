@@ -122,16 +122,16 @@ bool GltfRenderer::CreateRootSignature()
 	descTblRange[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// ルートパラメーター(ディスクリプタテーブル)の作成
-	D3D12_ROOT_PARAMETER rootParam[4] = {};
+	D3D12_ROOT_PARAMETER rootParam[5] = {};
 
 	// 0 番: シーン定数(b0)
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParam[0].Descriptor.ShaderRegister = 0;
 	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-	// 1 番: アクターの行列(b1)。描画中は変わらないので 1 回だけ設定する
-	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParam[1].Descriptor.ShaderRegister = 1;
+	// 1 番: インスタンスデータ(b1)
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+	rootParam[1].Descriptor.ShaderRegister = 2;
 	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
 	// 2 番: マテリアル(b2)とテクスチャ(t0)。マテリアルごとに付け替える
@@ -148,6 +148,11 @@ bool GltfRenderer::CreateRootSignature()
 	rootParam[3].DescriptorTable.pDescriptorRanges = &descTblRange[2];
 	rootParam[3].DescriptorTable.NumDescriptorRanges = 1;
 	rootParam[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	// 4 番: ボーン行列(t3)
+	rootParam[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+	rootParam[4].Descriptor.ShaderRegister = 3;
+	rootParam[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 	
 
 	// サンプラーの作成
@@ -178,7 +183,7 @@ bool GltfRenderer::CreateRootSignature()
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 	rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	rootSignatureDesc.pParameters = &rootParam[0];	// ルートパラメーターの先頭アドレス
-	rootSignatureDesc.NumParameters = 4;	// ルートパラメーター数
+	rootSignatureDesc.NumParameters = 5;	// ルートパラメーター数
 	rootSignatureDesc.pStaticSamplers = samplerDesc;
 	rootSignatureDesc.NumStaticSamplers = 2;
 
@@ -210,17 +215,22 @@ bool GltfRenderer::CreateShadowRootSignature()
 	// 影パスは深度しか書かない。
 	// ピクセルシェーダーが無いので、マテリアルもテクスチャもサンプラーも要らない。
 	// ディスクリプタテーブルが 1 つも無いため、ヒープの切り替えも不要になる。
-	D3D12_ROOT_PARAMETER rootParam[2] = {};
+	D3D12_ROOT_PARAMETER rootParam[3] = {};
 
 	// 0 番: シーン定数(b0)。lightCamera を読む
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParam[0].Descriptor.ShaderRegister = 0;
 	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
-	// 1 番: アクターの行列(b1)。world とボーン
-	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParam[1].Descriptor.ShaderRegister = 1;
+	// 1 番: インスタンスデータ(t2)
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+	rootParam[1].Descriptor.ShaderRegister = 2;
 	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+	// 2 番: ボーン行列(t3)
+	rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+	rootParam[2].Descriptor.ShaderRegister = 3;
+	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 	// 頂点レイアウトは使う。それ以外のステージからのアクセスは明示的に拒否する
@@ -231,7 +241,7 @@ bool GltfRenderer::CreateShadowRootSignature()
 		| D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS
 		| D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 	rootSignatureDesc.pParameters = rootParam;
-	rootSignatureDesc.NumParameters = 2;
+	rootSignatureDesc.NumParameters = 3;
 	rootSignatureDesc.pStaticSamplers = nullptr;
 	rootSignatureDesc.NumStaticSamplers = 0;
 

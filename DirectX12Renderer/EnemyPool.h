@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <d3d12.h>
+#include <wrl.h>
 #include <DirectXMath.h>
 #include <memory>
 #include <vector>
@@ -22,6 +24,8 @@ public:
     // @param count 用意する数。同時に存在できる最大数になる
     bool Init(size_t count);
 
+    bool BuildInstanceData();
+
     // 未使用の 1 体を指定位置に出す
     // @return 空きが無ければ false
     bool Spawn(const DirectX::XMFLOAT3& pos, float speedScale);
@@ -35,6 +39,7 @@ public:
 
     void Draw();
     void DrawShadow();
+    UINT DrawCount() const { return _drawCount; }
 
     // 全員を未使用に戻す（リスタート用）
     void ResetAll();
@@ -56,6 +61,13 @@ public:
     bool IsActive(size_t i) const { return _active[i]; }
 
 private:
+    template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+
+    bool CreateInstanceBuffers();
+
+    D3D12_GPU_VIRTUAL_ADDRESS InstanceAddress() const;
+    D3D12_GPU_VIRTUAL_ADDRESS BoneAddress() const;
+
     Dx12Wrapper& _dx12;
     GltfRenderer& _renderer;
     GltfModel& _model;
@@ -66,4 +78,15 @@ private:
     std::vector<bool> _active;   // 使用中かどうか
 
     size_t _activeLimit = 0;
+
+    ComPtr<ID3D12Resource> _instanceBuff;   // InstanceData × 定員 × FrameCount
+    ComPtr<ID3D12Resource> _boneBuff;       // XMMATRIX × 定員 × ジョイント数 × FrameCount
+    uint8_t* _mappedInstance = nullptr;
+    uint8_t* _mappedBone = nullptr;
+    UINT _instanceStride = 0;   // 1 フレーム分のバイト数
+    UINT _boneStride = 0;
+    UINT _jointCount = 0;
+    UINT _drawCount = 0;        // このフレームに詰めた数
+
+    bool _outlineEnabled = true;
 };

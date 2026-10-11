@@ -12,6 +12,16 @@ struct OutlineOutput
     float4 svpos : SV_POSITION;
 };
 
+// 1 体分のインスタンスデータ
+struct InstanceData
+{
+    matrix world;
+    uint boneOffset;
+    uint _pad0;
+    uint _pad1;
+    uint _pad2;
+};
+
 cbuffer SceneBuffer : register(b0)
 {
     matrix view;
@@ -28,16 +38,12 @@ cbuffer SceneBuffer : register(b0)
 Texture2D<float4> baseColorTex : register(t0);
 SamplerState smp : register(s0);
 
-cbuffer Transform : register(b1)
-{
-    matrix world;
-    matrix bones[256];
-};
-
 cbuffer Material : register(b2)
 {
     float4 baseColorFactor;
 };
 
 Texture2D<float> shadowMap : register(t1);
+StructuredBuffer<InstanceData> g_instances : register(t2);
+StructuredBuffer<matrix> g_bones : register(t3);
 SamplerComparisonState shadowSmp : register(s1);

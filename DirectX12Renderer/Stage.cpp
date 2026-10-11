@@ -40,6 +40,7 @@ bool Stage::Init()
 
     if (!CompileShaders()) return false;
     if (!CreateVertexAndIndexBuffer()) return false;
+    if (!CreateInstanceBuffer()) return false;
     if (!CreateRootSignature()) return false;
     if (!CreateShadowRootSignature()) return false;
     if (!CreatePipelineState()) return false;
@@ -99,6 +100,8 @@ void Stage::Draw()
     // 0 番：シーン共通
     cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
 
+    cmdList->SetGraphicsRootShaderResourceView(1, _instanceBuff->GetGPUVirtualAddress());
+
     // 2 番：シャドウマップ
     auto shadowHeap = _dx12.ShadowSrvHeap();
     ID3D12DescriptorHeap* heaps[] = { shadowHeap };
@@ -109,14 +112,7 @@ void Stage::Draw()
     cmdList->IASetVertexBuffers(0, 1, &_vbView);
     cmdList->IASetIndexBuffer(&_ibView);
 
-    // 箱ごとに、ワールド行列だけ差し替えて同じ立方体を描く
-    for (const auto& box : _boxes)
-    {
-        // 単位キューブを、箱の大きさと位置に合わせて変形する行列
-        auto world = BoxWorldMatrix(box.bounds);
-        cmdList->SetGraphicsRoot32BitConstants(1, 16, &world, 0);
-        cmdList->DrawIndexedInstanced(36, 1, 0, 0, 0);   // 立方体は三角形 12 枚
-    }
+    cmdList->DrawIndexedInstanced(36, static_cast<UINT>(_boxes.size()), 0, 0, 0);
 }
 
 void Stage::DrawShadow()
@@ -127,17 +123,13 @@ void Stage::DrawShadow()
     cmdList->SetGraphicsRootSignature(_shadowRootSignature.Get());
 
     cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
+    cmdList->SetGraphicsRootShaderResourceView(1, _instanceBuff->GetGPUVirtualAddress());
 
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->IASetVertexBuffers(0, 1, &_vbView);
     cmdList->IASetIndexBuffer(&_ibView);
 
-    for (const auto& box : _boxes)
-    {
-        auto world = BoxWorldMatrix(box.bounds);
-        cmdList->SetGraphicsRoot32BitConstants(1, 16, &world, 0);
-        cmdList->DrawIndexedInstanced(36, 1, 0, 0, 0);   // 立方体は三角形 12 枚
-    }
+    cmdList->DrawIndexedInstanced(36, static_cast<UINT>(_boxes.size()), 0, 0, 0);
 }
 
 bool Stage::CreateVertexAndIndexBuffer()
@@ -242,6 +234,44 @@ bool Stage::CreateVertexAndIndexBuffer()
     return true;
 }
 
+bool Stage::CreateInstanceBuffer()
+{
+    // 箱ごとのワールド行列を 1 本のバッファに並べる。
+    D3D12_HEAP_PROPERTIES heapProp = {};
+    heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+    D3D12_RESOURCE_DESC resDesc = {};
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resDesc.Width = sizeof(DirectX::XMMATRIX) * _boxes.size();
+    resDesc.Height = 1;
+    resDesc.DepthOrArraySize = 1;
+    resDesc.MipLevels = 1;
+    resDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    auto result = _dx12.Device()->CreateCommittedResource(
+        &heapProp, D3D12_HEAP_FLAG_NONE, &resDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+        IID_PPV_ARGS(&_instanceBuff));
+    if (!CheckResult(result, "CreateCommittedResource _instanceBuff")) return false;
+
+    DirectX::XMMATRIX* mapped = nullptr;
+    result = _instanceBuff->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
+    if (!CheckResult(result, "_instanceBuff->Map")) return false;
+
+    for (size_t i = 0; i < _boxes.size(); ++i)
+    {
+        mapped[i] = BoxWorldMatrix(_boxes[i].bounds);
+    }
+    _instanceBuff->Unmap(0, nullptr);   // 以降書き換えないので、アンマップ
+
+    return true;
+}
+
 bool Stage::CreateRootSignature()
 {
     // ディスクリプタレンジの作成
@@ -261,10 +291,9 @@ bool Stage::CreateRootSignature()
     rootParam[0].Descriptor.ShaderRegister = 0;
     rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    // 1 番: 箱ごとのワールド行列(b1)。定数バッファを作らず値を直接渡す
-    rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-    rootParam[1].Constants.ShaderRegister = 1;
-    rootParam[1].Constants.Num32BitValues = 16;
+    // 1 番: 箱ごとのワールド行列(t1) ルートSRV
+    rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    rootParam[1].Descriptor.ShaderRegister = 1;
     rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
     // 2 番: シャドウマップ(t0)
@@ -330,9 +359,8 @@ bool Stage::CreateShadowRootSignature()
     rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
     // 1 番: 箱ごとのワールド行列(b1)。通常描画と同じく 32bit 定数で渡す
-    rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-    rootParam[1].Constants.ShaderRegister = 1;
-    rootParam[1].Constants.Num32BitValues = 16;
+    rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    rootParam[1].Descriptor.ShaderRegister = 1;
     rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};

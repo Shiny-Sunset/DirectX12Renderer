@@ -72,7 +72,7 @@ namespace GameConfig
         constexpr float MinInterval = 1.6f;      // 最短の間隔
         constexpr float RampTime = 120.0f;        // この秒数かけて最短まで詰める
         constexpr float NestDistance = 12.0f;    // 巣穴の位置（中心からの距離）
-        constexpr size_t PoolSize = 300;          // 同時に存在できるアリの数
+        constexpr size_t PoolSize = 500;          // 同時に存在できるアリの数
     }
 
     // ------------------------------------------------------------

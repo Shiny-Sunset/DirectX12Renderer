@@ -8,6 +8,14 @@
 class Dx12Wrapper;
 struct cgltf_data;
 
+// シェーダーの InstanceData と並びを合わせること
+struct GltfInstanceData
+{
+    DirectX::XMMATRIX world;
+    UINT boneOffset;    // g_bones の中で、この個体のボーンが始まる位置
+    UINT _pad[3];       // 16 バイト境界に揃える
+};
+
 // このクラスは glTF(右手系) のglTF(.glb) モデルのデータを左手系に変換して取り込む。
 class GltfModel
 {

@@ -5,14 +5,19 @@ float4 ShadowVS(
     float4 normal : NORMAL,
     float2 uv : TEXCOORD,
     uint4 joints : JOINTS,
-    float4 weights : WEIGHTS
+    float4 weights : WEIGHTS,
+    uint instanceID : SV_InstanceID
 ) : SV_POSITION
 {   
+    InstanceData inst = g_instances[instanceID];
+    matrix world = inst.world;
+    uint bo = inst.boneOffset;
+
     // 4 本のボーン行列を重み付きで合成する
-    matrix bm = bones[joints.x] * weights.x
-              + bones[joints.y] * weights.y
-              + bones[joints.z] * weights.z
-              + bones[joints.w] * weights.w;
+    matrix bm = g_bones[bo + joints.x] * weights.x
+              + g_bones[bo + joints.y] * weights.y
+              + g_bones[bo + joints.z] * weights.z
+              + g_bones[bo + joints.w] * weights.w;
     
     pos = mul(bm, pos);
     pos = mul(world, pos);

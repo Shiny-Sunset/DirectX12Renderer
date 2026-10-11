@@ -1,8 +1,9 @@
 #include "StageShaderHeader.hlsli"
 
-StageOutput StageVS(float4 pos : POSITION, float4 normal : NORMAL)
+StageOutput StageVS(float4 pos : POSITION, float4 normal : NORMAL, uint instanceID : SV_InstanceID)
 {
     StageOutput output;
+    matrix world = g_instances[instanceID];
     pos = mul(world, pos);
     output.svpos = mul(mul(proj, view), pos); // ワールド行列は単位行列なので掛けない
     output.worldPos = pos.xyz;

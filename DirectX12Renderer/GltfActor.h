@@ -23,14 +23,19 @@ public:
     GltfActor(const GltfActor&) = delete;
     GltfActor& operator=(const GltfActor&) = delete;
 
-    // 定数バッファとディスクリプタヒープを作る（モデルの読み込みはしない）
-    bool Init();
+    // @param ownBuffer 自分用のインスタンスバッファを持つか。
+    //                  false のアクターは、外（EnemyPool）がまとめて詰めて描く
+    bool Init(bool ownBuffer = true);
 
     // -- 毎フレームの更新と描画 --
     // アニメーションを進め、ボーン行列とワールド行列を GPU へ送る
     void Update(float deltaTime);
 
     const GltfModel& Model() const { return _model; }
+
+    // インスタンスバッファへ詰めるために外から読む
+    DirectX::XMMATRIX WorldMatrix() const;
+    const std::vector<DirectX::XMMATRIX>& BoneMatrices() const { return _boneMatrices; }
 
     // 描画（GltfRenderer::BeforeDraw() の後に呼ぶ）
     void Draw();
@@ -80,10 +85,9 @@ private:
     template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     // シェーダーに渡すモデル固有の行列
-    // (GltfShaderHeader.hlsli の cbuffer Transform と並びを合わせること)
     struct TransformBufferData
     {
-        DirectX::XMMATRIX world;
+        GltfInstanceData instance;
         DirectX::XMMATRIX bones[GltfModel::MaxBoneCount];
     };
 
@@ -104,6 +108,10 @@ private:
     // @param weight 0 で a、1 で b
     void BlendNodes(const std::vector<GltfModel::Node>& a, const std::vector<GltfModel::Node>& b,
         float weight, std::vector<GltfModel::Node>& out) const;
+
+    TransformBufferData* Transform();
+    D3D12_GPU_VIRTUAL_ADDRESS InstanceAddress() const;   // t2 用
+    D3D12_GPU_VIRTUAL_ADDRESS BoneAddress() const;       // t3 用
 
     // -- 参照するもの（所有しない） --
     Dx12Wrapper& _dx12;
@@ -135,8 +143,6 @@ private:
     ComPtr<ID3D12Resource> _transformBuff;
     uint8_t* _mappedTransform = nullptr;   // マップしたまま保持
     UINT _transformStride = 0;
-    TransformBufferData* Transform();
-    D3D12_GPU_VIRTUAL_ADDRESS TransformAddress() const;
 
     // -- 表示 --
     bool _outlineEnabled = true;   // 輪郭線を描くか

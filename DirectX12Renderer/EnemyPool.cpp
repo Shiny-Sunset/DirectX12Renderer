@@ -5,19 +5,33 @@
 #include "GltfActor.h"
 #include "CharacterController.h"
 #include "Enemy.h"
+#include "Util.h"
 
 EnemyPool::EnemyPool(Dx12Wrapper& dx12, GltfRenderer& renderer, GltfModel& model)
 	:_dx12(dx12), _renderer(renderer), _model(model)
 { }
 
-EnemyPool::~EnemyPool() = default;
+EnemyPool::~EnemyPool()
+{
+    if (_mappedInstance != nullptr)
+    {
+        _instanceBuff->Unmap(0, nullptr);
+        _mappedInstance = nullptr;
+    }
+
+    if (_mappedBone != nullptr)
+    {
+        _boneBuff->Unmap(0, nullptr);
+        _mappedBone = nullptr;
+    }
+}
 
 bool EnemyPool::Init(size_t count)
 {
     for (size_t i = 0; i < count; ++i)
     {
         auto actor = std::make_unique<GltfActor>(_dx12, _renderer, _model);
-        if (!actor->Init()) return false;
+        if (!actor->Init(false)) return false;
         actor->SetVisible(false);          // 最初は非表示
         _actors.push_back(std::move(actor));
 
@@ -30,6 +44,105 @@ bool EnemyPool::Init(size_t count)
         _active.push_back(false);
     }
     _activeLimit = count;
+    if (!CreateInstanceBuffers()) return false;
+    return true;
+}
+
+bool EnemyPool::CreateInstanceBuffers()
+{
+    _jointCount = static_cast<UINT>(_model.JointNodes().size());
+    const UINT capacity = static_cast<UINT>(_enemies.size());
+
+    _instanceStride = static_cast<UINT>(AlignmentedSize(
+        sizeof(GltfInstanceData) * capacity, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+    _boneStride = static_cast<UINT>(AlignmentedSize(
+        sizeof(DirectX::XMMATRIX) * capacity * _jointCount, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+
+    // ヒープの設定
+    D3D12_HEAP_PROPERTIES transformHeapProp = {};
+
+    transformHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;        // CPUからアクセス可能(マップ可能)
+    transformHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    transformHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+    // リソースの設定
+    D3D12_RESOURCE_DESC transformResDesc = {};
+
+    transformResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    transformResDesc.Width = _instanceStride * Dx12Wrapper::FrameCount;
+    transformResDesc.Height = 1;                          // 必ず 1
+    transformResDesc.DepthOrArraySize = 1;                // 必ず 1
+    transformResDesc.MipLevels = 1;                       // 必ず 1
+    transformResDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
+    transformResDesc.SampleDesc.Count = 1;                // 必ず 1
+    transformResDesc.SampleDesc.Quality = 0;              // 必ず 0
+    transformResDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
+    transformResDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
+
+    auto result = _dx12.Device()->CreateCommittedResource(
+        &transformHeapProp,
+        D3D12_HEAP_FLAG_NONE,
+        &transformResDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&_instanceBuff)
+    );
+    if (!CheckResult(result, "CreateCommittedResource _instanceBuff")) return false;
+
+    // 毎フレーム書き換えるので、マップしたままにしておく(Unmap はデストラクタで行う)
+    result = _instanceBuff->Map(0, nullptr, reinterpret_cast<void**>(&_mappedInstance));
+    if (!CheckResult(result, "_instanceBuff->Map")) return false;
+
+    transformResDesc.Width = _boneStride * Dx12Wrapper::FrameCount;
+
+    result = _dx12.Device()->CreateCommittedResource(
+        &transformHeapProp,
+        D3D12_HEAP_FLAG_NONE,
+        &transformResDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&_boneBuff)
+    );
+    if (!CheckResult(result, "CreateCommittedResource _boneBuff")) return false;
+
+    // 毎フレーム書き換えるので、マップしたままにしておく(Unmap はデストラクタで行う)
+    result = _boneBuff->Map(0, nullptr, reinterpret_cast<void**>(&_mappedBone));
+    if (!CheckResult(result, "_boneBuff->Map")) return false;
+
+    return true;
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS EnemyPool::InstanceAddress() const
+{
+    return _instanceBuff->GetGPUVirtualAddress() + _dx12.FrameIndex() * _instanceStride;
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS EnemyPool::BoneAddress() const
+{
+    // 同じリソースの中の bones の位置を指す
+    return _boneBuff->GetGPUVirtualAddress() + _dx12.FrameIndex() * _boneStride;
+}
+
+bool EnemyPool::BuildInstanceData()
+{
+    auto* inst = reinterpret_cast<GltfInstanceData*>(
+        _mappedInstance + _dx12.FrameIndex() * _instanceStride);
+    auto* bones = reinterpret_cast<DirectX::XMMATRIX*>(
+        _mappedBone + _dx12.FrameIndex() * _boneStride);
+
+    _drawCount = 0;
+    for (size_t i = 0; i < _actors.size(); ++i)
+    {
+        // 描画側と同じ条件で選ぶこと（食い違うと段階 3 で行列がずれる）
+        if (!_active[i] || !_actors[i]->IsVisible()) continue;
+
+        const UINT slot = _drawCount++;
+        inst[slot].world = _actors[i]->WorldMatrix();
+        inst[slot].boneOffset = slot * _jointCount;
+
+        const auto& bm = _actors[i]->BoneMatrices();
+        std::copy(bm.begin(), bm.end(), bones + slot * _jointCount);
+    }
     return true;
 }
 
@@ -73,24 +186,89 @@ void EnemyPool::UpdateActors(float deltaTime)
         if (!_active[i]) continue;
         _actors[i]->Update(deltaTime);
     }
+    BuildInstanceData();
 }
 
 void EnemyPool::Draw()
 {
+    if (_drawCount == 0) return;
+
+    auto cmdList = _dx12.CommandList();
     _renderer.SetModelHeap(_model);
-    for (size_t i = 0; i < _actors.size(); ++i)
+
+    cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
+    cmdList->SetGraphicsRootShaderResourceView(1, InstanceAddress());
+    cmdList->SetGraphicsRootShaderResourceView(4, BoneAddress());
+    cmdList->SetGraphicsRootDescriptorTable(3, _model.ShadowHandle());
+
+    cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
+    cmdList->IASetIndexBuffer(&_model.IndexBufferView());
+
+    // プリミティブごとに、担当する範囲だけを描く
+    // 0 周目: 輪郭線
+    // 押し出したメッシュの裏面を描き、本体で覆われなかった縁だけが線として残る
+    // 半透明マテリアルは面の縁が出てしまうため除外する
+    if (_outlineEnabled)
     {
-        if (!_active[i]) continue;
-        _actors[i]->Draw();
+        cmdList->SetPipelineState(_renderer.OutlinePipelineState());
+        cmdList->SetGraphicsRootDescriptorTable(2, _model.MaterialHandle(0));
+        for (const auto& p : _model.Primitives())
+        {
+            if (p.isBlend) continue;
+
+            cmdList->DrawIndexedInstanced(
+                p.indexCount, _drawCount, p.startIndexLocation, p.baseVertexLocation, 0
+            );
+        }
+    }
+
+    // 1 周目: 不透明
+    cmdList->SetPipelineState(_renderer.PipelineState());
+    for (const auto& p : _model.Primitives())
+    {
+        if (p.isBlend) continue;        // 半透明は 2 周目で描く
+
+        auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
+        cmdList->SetGraphicsRootDescriptorTable(2, _model.MaterialHandle(matIdx));
+
+        cmdList->DrawIndexedInstanced(
+            p.indexCount, _drawCount, p.startIndexLocation, p.baseVertexLocation, 0
+        );
+    }
+
+    // 2 周目: 半透明(背景が確定してからでないとブレンドできない)
+    cmdList->SetPipelineState(_renderer.BlendPipelineState());
+    for (const auto& p : _model.Primitives())
+    {
+        if (!p.isBlend) continue;
+
+        auto matIdx = (p.materialIndex >= 0) ? p.materialIndex : 0;
+        cmdList->SetGraphicsRootDescriptorTable(2, _model.MaterialHandle(matIdx));
+
+        cmdList->DrawIndexedInstanced(
+            p.indexCount, _drawCount, p.startIndexLocation, p.baseVertexLocation, 0
+        );
     }
 }
 
 void EnemyPool::DrawShadow()
 {
-    for (size_t i = 0; i < _actors.size(); ++i)
+    if (_drawCount == 0) return;
+
+    auto cmdList = _dx12.CommandList();
+
+    cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
+    cmdList->SetGraphicsRootShaderResourceView(1, InstanceAddress());   // t2
+    cmdList->SetGraphicsRootShaderResourceView(2, BoneAddress());       // t3
+
+    cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
+    cmdList->IASetIndexBuffer(&_model.IndexBufferView());
+
+    // 全プリミティブをまとめて描く（半透明は影を落とさない方が自然なので除外）
+    for (const auto& prim : _model.Primitives())
     {
-        if (!_active[i]) continue;
-        _actors[i]->DrawShadow();
+        if (prim.isBlend) continue;
+        cmdList->DrawIndexedInstanced(prim.indexCount, _drawCount, prim.startIndexLocation, prim.baseVertexLocation, 0);
     }
 }
 

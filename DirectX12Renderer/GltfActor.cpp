@@ -29,7 +29,7 @@ GltfActor::~GltfActor()
 	}
 }
 
-bool GltfActor::Init()
+bool GltfActor::Init(bool ownBuffer)
 {
 	_boneMatrices.resize(_model.JointNodes().size());
 	if (!CreateTransformBuffer()) return false;
@@ -89,22 +89,28 @@ void GltfActor::Update(float deltaTime)
 	UpdateWorldMatrix();
 }
 
-void GltfActor::UpdateWorldMatrix()
+DirectX::XMMATRIX GltfActor::WorldMatrix() const
 {
-	Transform()->world =
-		DirectX::XMMatrixScaling(_scale, _scale, _scale)
+	return DirectX::XMMatrixScaling(_scale, _scale, _scale)
 		* DirectX::XMMatrixRotationY(_rotationY + ModelYawOffset)
 		* DirectX::XMMatrixTranslation(_position.x, _position.y, _position.z);
 }
 
+void GltfActor::UpdateWorldMatrix()
+{
+	if (_mappedTransform == nullptr) return;
+	Transform()->instance.world = WorldMatrix();   // 式を 2 箇所に持たない
+}
+
 void GltfActor::Draw()
 {
+	assert(_mappedTransform != nullptr);
 	if (!_visible) return;
 	auto cmdList = _dx12.CommandList();
 	// ルートパラメーター 0 番にシーン定数 b0
 	cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
-	// ルートパラメーター 1 番にアクターの行列 b1
-	cmdList->SetGraphicsRootConstantBufferView(1, TransformAddress());
+	cmdList->SetGraphicsRootShaderResourceView(1, InstanceAddress());   // t2
+	cmdList->SetGraphicsRootShaderResourceView(4, BoneAddress());       // t3
 
 	cmdList->SetGraphicsRootDescriptorTable(3, _model.ShadowHandle());	// [0] シャドウ
 
@@ -163,12 +169,13 @@ void GltfActor::Draw()
 
 void GltfActor::DrawShadow()
 {
+	assert(_mappedTransform != nullptr);
 	if (!_visible) return;
 	auto cmdList = _dx12.CommandList();
 
-	// b0(シーン) と b1(ボーン) だけ渡す。マテリアルとテクスチャは要らない
 	cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
-	cmdList->SetGraphicsRootConstantBufferView(1, TransformAddress());
+	cmdList->SetGraphicsRootShaderResourceView(1, InstanceAddress());   // t2
+	cmdList->SetGraphicsRootShaderResourceView(2, BoneAddress());       // t3
 
 	cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
 	cmdList->IASetIndexBuffer(&_model.IndexBufferView());
@@ -224,7 +231,8 @@ bool GltfActor::CreateTransformBuffer()
 	for (UINT i = 0; i < Dx12Wrapper::FrameCount; ++i)
 	{
 		auto* t = reinterpret_cast<TransformBufferData*>(_mappedTransform + i * _transformStride);
-		t->world = DirectX::XMMatrixIdentity();
+		t->instance.world = DirectX::XMMatrixIdentity();
+		t->instance.boneOffset = 0;
 		std::fill_n(t->bones, GltfModel::MaxBoneCount, DirectX::XMMatrixIdentity());
 		std::copy(_boneMatrices.begin(), _boneMatrices.end(), t->bones);
 	}
@@ -254,8 +262,9 @@ void GltfActor::UpdateBoneMatrices()
 		_boneMatrices[j] = _model.InverseBindMatrices()[j] * globals[_model.JointNodes()[j]];
 	}
 
-	// GPU へ
-	std::copy(_boneMatrices.begin(), _boneMatrices.end(), Transform()->bones);
+	// 自分用のバッファを持たないアクターは、EnemyPool がまとめて詰める
+	if (_mappedTransform != nullptr)
+		std::copy(_boneMatrices.begin(), _boneMatrices.end(), Transform()->bones);
 
 #ifdef _DEBUG
 	static bool logged = false;
@@ -410,7 +419,13 @@ GltfActor::TransformBufferData* GltfActor::Transform()
 		_mappedTransform + _dx12.FrameIndex() * _transformStride);
 }
 
-D3D12_GPU_VIRTUAL_ADDRESS GltfActor::TransformAddress() const
+D3D12_GPU_VIRTUAL_ADDRESS GltfActor::InstanceAddress() const
 {
 	return _transformBuff->GetGPUVirtualAddress() + _dx12.FrameIndex() * _transformStride;
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS GltfActor::BoneAddress() const
+{
+	// 同じリソースの中の bones の位置を指す
+	return InstanceAddress() + offsetof(TransformBufferData, bones);
 }
