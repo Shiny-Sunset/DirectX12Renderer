@@ -75,18 +75,24 @@ void Enemy::Update(float deltaTime, const GameConfig::Enemy::Target& target, con
 
             // -- 詰まりの検知 --
             // 実際に動けた距離が、予定の 3 割に満たなければ壁にぶつかっている
-            const auto& pos = _actor.Position();
-            const float movedX = pos.x - _prevPos.x;
-            const float movedZ = pos.z - _prevPos.z;
-            const float moved = sqrtf(movedX * movedX + movedZ * movedZ);
-            const float expected = ChaseSpeed() * deltaTime;
-
-            if (_avoidTimer <= 0.0f && expected > 1e-5f && moved < expected * StuckThreshold)
+            _stuckTimer += deltaTime;
+            if (_stuckTimer >= StuckCheckInterval)
             {
-                _avoidTimer = AvoidTime;
-                _avoidSide = (rand() % 2 == 0) ? 1.0f : -1.0f;   // 左右どちらへ逸れるかは運任せ
+                const auto& pos = _actor.Position();
+                const float movedX = pos.x - _prevPos.x;
+                const float movedZ = pos.z - _prevPos.z;
+                const float moved = sqrtf(movedX * movedX + movedZ * movedZ);
+                const float expected = ChaseSpeed() * _stuckTimer;
+
+                if (_avoidTimer <= 0.0f && expected > 1e-5f && moved < expected * StuckThreshold)
+                {
+                    _avoidTimer = AvoidTime;
+                    _avoidSide = (rand() % 2 == 0) ? 1.0f : -1.0f;
+                }
+
+                _prevPos = pos;
+                _stuckTimer = 0.0f;
             }
-            _prevPos = pos;
 
             // -- 回避中は横向きの成分を混ぜる --
             if (_avoidTimer > 0.0f)
@@ -214,6 +220,7 @@ void Enemy::Reset(const DirectX::XMFLOAT3& pos)
     _stateTime = 0.0f;
     _prevPos = pos;
     _avoidTimer = 0.0f;
+    _stuckTimer = 0.0f;
 
     _actor.SetPosition(pos);
     _actor.SetRotationY(0.0f);

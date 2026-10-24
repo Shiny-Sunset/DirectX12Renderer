@@ -2,7 +2,8 @@
 // ※ このファイルは SceneBuffer(b0) を宣言したヘッダの「後に」include すること
 
 // 影に入っているかだけを返す（0 = 完全に影、1 = 光が当たっている）
-float ComputeShadowLit(float4 tpos, float ndl, Texture2D<float> shadowMap, SamplerComparisonState shadowSmp)
+float ComputeShadowLit(float4 tpos, float ndl, uint cascade,
+                       Texture2DArray<float> shadowMap, SamplerComparisonState shadowSmp)
 {
     float lit = 0.0;
     if (ndl <= 0.0)
@@ -30,7 +31,7 @@ float ComputeShadowLit(float4 tpos, float ndl, Texture2D<float> shadowMap, Sampl
         for (int x = -1; x <= 1; ++x)
         {
             lit += shadowMap.SampleCmpLevelZero(
-                shadowSmp, shadowUV + float2(x, y) * shadowMapTexel, depth);
+                shadowSmp, float3(shadowUV + float2(x, y) * shadowMapTexel, cascade), depth);
         }
     }
     lit /= 9.0;
@@ -46,8 +47,8 @@ float ComputeShadowLit(float4 tpos, float ndl, Texture2D<float> shadowMap, Sampl
 // @param shadowMap シャドウマップ
 // @param shadowSmp 比較用サンプラー
 // @return 明るさの倍率（影なら暗い値）
-float ComputeBrightness(float3 n, float3 lightVec, float4 tpos,
-                        Texture2D<float> shadowMap, SamplerComparisonState shadowSmp)
+float ComputeBrightness(float3 n, float3 lightVec, float4 tpos, uint cascade,
+                        Texture2DArray<float> shadowMap, SamplerComparisonState shadowSmp)
 {
     static const float ShadowLevel = 0.4; // 影の暗さ
     
@@ -55,6 +56,6 @@ float ComputeBrightness(float3 n, float3 lightVec, float4 tpos,
     // saturate(ndl * 2.0) は ComputeShadowLit の中で掛けている。
     // ここで再度掛けると、キャラクター(ComputeShadowLit を直接呼ぶ)との間で
     // 陰影が食い違う(光源の仰角が低いときに地面だけ極端に暗くなる)
-    float lit = ComputeShadowLit(tpos, ndl, shadowMap, shadowSmp);
+    float lit = ComputeShadowLit(tpos, ndl, cascade, shadowMap, shadowSmp);
     return lerp(ShadowLevel, 1.0, lit);
 }

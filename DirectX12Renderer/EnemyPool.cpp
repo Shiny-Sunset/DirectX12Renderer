@@ -57,32 +57,34 @@ bool EnemyPool::CreateInstanceBuffers()
         sizeof(GltfInstanceData) * capacity, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
     _boneStride = static_cast<UINT>(AlignmentedSize(
         sizeof(DirectX::XMMATRIX) * capacity * _jointCount, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+    _visibleStride = static_cast<UINT>(AlignmentedSize(
+        sizeof(UINT) * capacity, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 
     // ヒープの設定
-    D3D12_HEAP_PROPERTIES transformHeapProp = {};
+    D3D12_HEAP_PROPERTIES transformheapProp = {};
 
-    transformHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;        // CPUからアクセス可能(マップ可能)
-    transformHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    transformHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    transformheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;        // CPUからアクセス可能(マップ可能)
+    transformheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    transformheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
     // リソースの設定
-    D3D12_RESOURCE_DESC transformResDesc = {};
+    D3D12_RESOURCE_DESC transformresDesc = {};
 
-    transformResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    transformResDesc.Width = _instanceStride * Dx12Wrapper::FrameCount;
-    transformResDesc.Height = 1;                          // 必ず 1
-    transformResDesc.DepthOrArraySize = 1;                // 必ず 1
-    transformResDesc.MipLevels = 1;                       // 必ず 1
-    transformResDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
-    transformResDesc.SampleDesc.Count = 1;                // 必ず 1
-    transformResDesc.SampleDesc.Quality = 0;              // 必ず 0
-    transformResDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
-    transformResDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
+    transformresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    transformresDesc.Width = _instanceStride * Dx12Wrapper::FrameCount;
+    transformresDesc.Height = 1;                          // 必ず 1
+    transformresDesc.DepthOrArraySize = 1;                // 必ず 1
+    transformresDesc.MipLevels = 1;                       // 必ず 1
+    transformresDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
+    transformresDesc.SampleDesc.Count = 1;                // 必ず 1
+    transformresDesc.SampleDesc.Quality = 0;              // 必ず 0
+    transformresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
+    transformresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
 
     auto result = _dx12.Device()->CreateCommittedResource(
-        &transformHeapProp,
+        &transformheapProp,
         D3D12_HEAP_FLAG_NONE,
-        &transformResDesc,
+        &transformresDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&_instanceBuff)
@@ -93,12 +95,12 @@ bool EnemyPool::CreateInstanceBuffers()
     result = _instanceBuff->Map(0, nullptr, reinterpret_cast<void**>(&_mappedInstance));
     if (!CheckResult(result, "_instanceBuff->Map")) return false;
 
-    transformResDesc.Width = _boneStride * Dx12Wrapper::FrameCount;
+    transformresDesc.Width = _boneStride * Dx12Wrapper::FrameCount;
 
     result = _dx12.Device()->CreateCommittedResource(
-        &transformHeapProp,
+        &transformheapProp,
         D3D12_HEAP_FLAG_NONE,
-        &transformResDesc,
+        &transformresDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&_boneBuff)
@@ -108,6 +110,23 @@ bool EnemyPool::CreateInstanceBuffers()
     // 毎フレーム書き換えるので、マップしたままにしておく(Unmap はデストラクタで行う)
     result = _boneBuff->Map(0, nullptr, reinterpret_cast<void**>(&_mappedBone));
     if (!CheckResult(result, "_boneBuff->Map")) return false;
+
+    transformresDesc.Width = _visibleStride * GameConfig::CascadeCount * Dx12Wrapper::FrameCount;
+
+    result = _dx12.Device()->CreateCommittedResource(
+        &transformheapProp,
+        D3D12_HEAP_FLAG_NONE,
+        &transformresDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&_visibleBuff)
+    );
+    if (!CheckResult(result, "CreateCommittedResource _boneBuff")) return false;
+
+    result = _visibleBuff->Map(0, nullptr, reinterpret_cast<void**>(&_mappedVisible));
+    if (!CheckResult(result, "_visibleBuff->Map")) return false;
+
+    _slotActors.resize(capacity);
 
     return true;
 }
@@ -137,11 +156,29 @@ bool EnemyPool::BuildInstanceData()
         if (!_active[i] || !_actors[i]->IsVisible()) continue;
 
         const UINT slot = _drawCount++;
+        _slotActors[slot] = _actors[i].get();     // 可視リストを作るときに引く
+
         inst[slot].world = _actors[i]->WorldMatrix();
         inst[slot].boneOffset = slot * _jointCount;
 
         const auto& bm = _actors[i]->BoneMatrices();
         std::copy(bm.begin(), bm.end(), bones + slot * _jointCount);
+    }
+
+    // カスケードごとに「どの体を描くか」の一覧を作る。
+    // 箱は同心なので、小さいカスケードに入る体は大きいほうにも必ず入る
+    for (UINT c = 0; c < GameConfig::CascadeCount; ++c)
+    {
+        auto* list = reinterpret_cast<UINT*>(_mappedVisible
+            + (_dx12.FrameIndex() * GameConfig::CascadeCount + c) * _visibleStride);
+
+        UINT n = 0;
+        for (UINT slot = 0; slot < _drawCount; ++slot)
+        {
+            if (!CastsShadowIn(*_slotActors[slot], c)) continue;
+            list[n++] = slot;
+        }
+        _visibleCount[c] = n;
     }
     return true;
 }
@@ -186,7 +223,11 @@ void EnemyPool::UpdateActors(float deltaTime)
         if (!_active[i]) continue;
         _actors[i]->Update(deltaTime);
     }
-    BuildInstanceData();
+
+    {
+        AccumTimer t(Profile::msInstance);
+        BuildInstanceData();
+    }
 }
 
 void EnemyPool::Draw()
@@ -253,13 +294,15 @@ void EnemyPool::Draw()
 
 void EnemyPool::DrawShadow()
 {
-    if (_drawCount == 0) return;
+    const UINT c = _dx12.CurrentCascade();
+    if (_visibleCount[c] == 0) return;
 
     auto cmdList = _dx12.CommandList();
 
     cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
     cmdList->SetGraphicsRootShaderResourceView(1, InstanceAddress());   // t2
     cmdList->SetGraphicsRootShaderResourceView(2, BoneAddress());       // t3
+    cmdList->SetGraphicsRootShaderResourceView(4, VisibleAddress(c));   // t4
 
     cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
     cmdList->IASetIndexBuffer(&_model.IndexBufferView());
@@ -268,7 +311,7 @@ void EnemyPool::DrawShadow()
     for (const auto& prim : _model.Primitives())
     {
         if (prim.isBlend) continue;
-        cmdList->DrawIndexedInstanced(prim.indexCount, _drawCount, prim.startIndexLocation, prim.baseVertexLocation, 0);
+        cmdList->DrawIndexedInstanced(prim.indexCount, _visibleCount[c], prim.startIndexLocation, prim.baseVertexLocation, 0);
     }
 }
 
@@ -305,4 +348,25 @@ void EnemyPool::SetActiveLimit(size_t n)
         _actors[i]->SetVisible(false);
         _controllers[i]->SetCollisionEnabled(false);
     }
+}
+
+D3D12_GPU_VIRTUAL_ADDRESS EnemyPool::VisibleAddress(UINT c) const
+{
+    return _visibleBuff->GetGPUVirtualAddress()
+        + (_dx12.FrameIndex() * GameConfig::CascadeCount + c) * _visibleStride;
+}
+
+bool EnemyPool::CastsShadowIn(const GltfActor& actor, UINT cascade) const
+{
+    const auto pos = DirectX::XMLoadFloat3(&actor.Position());
+    const auto clip = DirectX::XMVector3TransformCoord(pos, _dx12.LightCamera(cascade));
+
+    DirectX::XMFLOAT3 ndc;
+    DirectX::XMStoreFloat3(&ndc, clip);
+
+    // 行列と箱の大きさは、必ず同じカスケードから取る
+    const float margin = GameConfig::Enemy::ShadowMargin * 2.0f
+        / (GameConfig::CascadeAreas[cascade] * _dx12.ShadowAreaScale());
+
+    return fabsf(ndc.x) <= 1.0f + margin && fabsf(ndc.y) <= 1.0f + margin;
 }

@@ -1,9 +1,9 @@
 struct Output
 {
     float4 svpos : SV_POSITION;
+    float3 worldPos : POSITION;
     float3 normal : NORMAL;
     float2 uv : TEXCOORD;
-    float4 tpos : TPOS;
 };
 
 // 輪郭線パス用（位置だけあればよい）
@@ -25,12 +25,15 @@ struct InstanceData
 cbuffer SceneBuffer : register(b0)
 {
     matrix view;
-    matrix proj;
-    matrix lightCamera;
+    matrix viewProj;
+    matrix lightCamera[3];
     float3 eye;
     float _pad0;
     float3 lightVec;
-    float shadowMapTexel;
+    float shadowMapTexel; // 1 / 2048（全カスケード共通）
+    float4 cascadeRadius; // x, y = 分割距離（ビュー空間 Z）
+    float4 cascadeNormalOffset; // x, y, z = 押し出し量（m）
+    float4 shadowCenter;
     float lightRange;
     float3 _pad1;
 };
@@ -43,7 +46,8 @@ cbuffer Material : register(b2)
     float4 baseColorFactor;
 };
 
-Texture2D<float> shadowMap : register(t1);
+Texture2DArray<float> shadowMap : register(t1);
 StructuredBuffer<InstanceData> g_instances : register(t2);
+StructuredBuffer<uint> g_visible : register(t4);
 StructuredBuffer<matrix> g_bones : register(t3);
 SamplerComparisonState shadowSmp : register(s1);

@@ -80,3 +80,37 @@ private:
     float& _out;
     std::chrono::steady_clock::time_point _start;
 };
+
+// ループの中で何度も通る区間用。代入ではなく足し込む
+// （ScopedTimer と分けてあるのは、リセットし忘れると延々と増え続けるため）
+class AccumTimer
+{
+public:
+    explicit AccumTimer(float& outMs)
+        : _out(outMs), _start(std::chrono::steady_clock::now()) {
+    }
+
+    ~AccumTimer()
+    {
+        _out += std::chrono::duration<float, std::milli>(
+            std::chrono::steady_clock::now() - _start).count();
+    }
+
+    AccumTimer(const AccumTimer&) = delete;
+    AccumTimer& operator=(const AccumTimer&) = delete;
+
+private:
+    float& _out;
+    std::chrono::steady_clock::time_point _start;
+};
+
+// 計測値の置き場。Application から配れない場所（GltfActor の中など）で使う
+// フレームの先頭で必ず Reset() すること
+namespace Profile
+{
+    inline float msSample = 0.0f;     // アニメーションのサンプリング
+    inline float msBone = 0.0f;       // ボーン行列の計算
+    inline float msInstance = 0.0f;   // インスタンスバッファへの書き込み
+
+    inline void Reset() { msSample = 0.0f; msBone = 0.0f; msInstance = 0.0f; }
+}

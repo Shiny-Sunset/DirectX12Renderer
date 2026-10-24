@@ -1,5 +1,6 @@
 ﻿#include "Dx12Wrapper.h"
 #include "Util.h"
+#include "GameConfig.h"
 #include <DirectXTex.h>
 #include <algorithm>
 #include <iostream>
@@ -27,15 +28,15 @@ namespace
 	}
 
 	// WriteToSubresource で転送する用のヒープ設定を返す
-	D3D12_HEAP_PROPERTIES TextureHeapProperties()
+	D3D12_HEAP_PROPERTIES TextureheapProperties()
 	{
-		D3D12_HEAP_PROPERTIES texHeapProp = {};
-		texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
-		texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
-		texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
-		texHeapProp.CreationNodeMask = 0;	// 単一アダプターのため 0
-		texHeapProp.VisibleNodeMask = 0;	// 単一アダプターのため 0
-		return texHeapProp;
+		D3D12_HEAP_PROPERTIES texheapProp = {};
+		texheapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
+		texheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+		texheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+		texheapProp.CreationNodeMask = 0;	// 単一アダプターのため 0
+		texheapProp.VisibleNodeMask = 0;	// 単一アダプターのため 0
+		return texheapProp;
 	}
 
 	// 単色などの小さな 2D テクスチャ用のリソース設定を返す
@@ -86,6 +87,7 @@ bool Dx12Wrapper::Init(HWND hwnd, int windowWidth, int windowHeight)
 	if (!CreateDepthBuffer()) return false;
 	if (!CreateSceneConstantBuffer()) return false;
 	if (!CreateDefaultTextures()) return false;
+	if (!CreateGpuTimer()) return false;
 
 	// ビューポートの作成
 	_viewport.Width = static_cast<float>(_windowWidth);	// 出力先の幅(ピクセル数)
@@ -214,7 +216,7 @@ bool Dx12Wrapper::CreateSwapChain(HWND hwnd)
 	swapchainDesc.SampleDesc.Count = 1;
 	swapchainDesc.SampleDesc.Quality = 0;
 	swapchainDesc.BufferUsage = DXGI_USAGE_BACK_BUFFER;
-	swapchainDesc.BufferCount = 2;
+	swapchainDesc.BufferCount = BufferCount;
 
 	// バックバッファは伸び縮み可能
 	swapchainDesc.Scaling = DXGI_SCALING_STRETCH;
@@ -253,7 +255,7 @@ bool Dx12Wrapper::CreateFinalRenderTargets()
 
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;		// レンダーターゲットビューなのでRTV
 	heapDesc.NodeMask = 0;
-	heapDesc.NumDescriptors = 2;						// 表裏の2つ
+	heapDesc.NumDescriptors = BufferCount;
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;	// 特に指定なし
 
 	auto result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&_rtvHeaps));
@@ -291,20 +293,20 @@ bool Dx12Wrapper::CreateFinalRenderTargets()
 bool Dx12Wrapper::CreateDepthBuffer()
 {
 	// 深度バッファの作成
-	D3D12_RESOURCE_DESC depthResDesc = {};
-	depthResDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;	// 2 次元のテクスチャデータ
-	depthResDesc.Width = _windowWidth;	// 幅と高さはレンダーターゲットと同じ
-	depthResDesc.Height = _windowHeight;	// 同上
-	depthResDesc.DepthOrArraySize = 1;	// テクスチャ配列でも、3D テクスチャでもない
-	depthResDesc.Format = DXGI_FORMAT_D32_FLOAT;	// 深度値書き込み用フォーマット
-	depthResDesc.SampleDesc.Count = 1;	// サンプルは 1 ピクセルあたり 1 つ
-	depthResDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;	// デプスステンシルとして使用
+	D3D12_RESOURCE_DESC depthresDesc = {};
+	depthresDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;	// 2 次元のテクスチャデータ
+	depthresDesc.Width = _windowWidth;	// 幅と高さはレンダーターゲットと同じ
+	depthresDesc.Height = _windowHeight;	// 同上
+	depthresDesc.DepthOrArraySize = 1;	// テクスチャ配列でも、3D テクスチャでもない
+	depthresDesc.Format = DXGI_FORMAT_D32_FLOAT;	// 深度値書き込み用フォーマット
+	depthresDesc.SampleDesc.Count = 1;	// サンプルは 1 ピクセルあたり 1 つ
+	depthresDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;	// デプスステンシルとして使用
 
 	// 深度値用ヒーププロパティ
-	D3D12_HEAP_PROPERTIES depthHeapProp = {};
-	depthHeapProp.Type = D3D12_HEAP_TYPE_DEFAULT;	// デフォルトなのであとは UNKNOWN でよい
-	depthHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	depthHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	D3D12_HEAP_PROPERTIES depthheapProp = {};
+	depthheapProp.Type = D3D12_HEAP_TYPE_DEFAULT;	// デフォルトなのであとは UNKNOWN でよい
+	depthheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	depthheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// このクリアバリューが重要な意味を持つ
 	D3D12_CLEAR_VALUE depthClearValue = {};
@@ -312,9 +314,9 @@ bool Dx12Wrapper::CreateDepthBuffer()
 	depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;	// 32 ビット float 値としてクリア
 
 	auto result = _dev->CreateCommittedResource(
-		&depthHeapProp,
+		&depthheapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&depthResDesc,
+		&depthresDesc,
 		D3D12_RESOURCE_STATE_DEPTH_WRITE,
 		&depthClearValue,
 		IID_PPV_ARGS(&_depthBuffer)
@@ -347,31 +349,31 @@ bool Dx12Wrapper::CreateDepthBuffer()
 bool Dx12Wrapper::CreateSceneConstantBuffer()
 {
 	// ヒープの設定
-	D3D12_HEAP_PROPERTIES constHeapProp = {};
+	D3D12_HEAP_PROPERTIES constheapProp = {};
 
-	constHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
-	constHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	constHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	constheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
+	constheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	constheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// リソースの設定
-	D3D12_RESOURCE_DESC constResDesc = {};
+	D3D12_RESOURCE_DESC constresDesc = {};
 
-	constResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	constresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	_sceneCBStride = static_cast<UINT>(AlignmentedSize(sizeof(SceneMatrix), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-	constResDesc.Width = _sceneCBStride * FrameCount;
-	constResDesc.Height = 1;                          // 必ず 1
-	constResDesc.DepthOrArraySize = 1;                // 必ず 1
-	constResDesc.MipLevels = 1;                       // 必ず 1
-	constResDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
-	constResDesc.SampleDesc.Count = 1;                // 必ず 1
-	constResDesc.SampleDesc.Quality = 0;              // 必ず 0
-	constResDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
-	constResDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
+	constresDesc.Width = _sceneCBStride * FrameCount;
+	constresDesc.Height = 1;                          // 必ず 1
+	constresDesc.DepthOrArraySize = 1;                // 必ず 1
+	constresDesc.MipLevels = 1;                       // 必ず 1
+	constresDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
+	constresDesc.SampleDesc.Count = 1;                // 必ず 1
+	constresDesc.SampleDesc.Quality = 0;              // 必ず 0
+	constresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
+	constresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
 
 	auto result = _dev->CreateCommittedResource(
-		&constHeapProp,
+		&constheapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&constResDesc,
+		&constresDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_sceneConstBuff)
@@ -469,9 +471,9 @@ bool Dx12Wrapper::CreateShadowMap()
 
 	D3D12_RESOURCE_DESC resDesc = {};
 	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Width = ShadowMapSize;
-	resDesc.Height = ShadowMapSize;
-	resDesc.DepthOrArraySize = 1;
+	resDesc.Width = GameConfig::ShadowMapSize;
+	resDesc.Height = GameConfig::ShadowMapSize;
+	resDesc.DepthOrArraySize = GameConfig::CascadeCount;   // 2048 × 2048 × 3
 	resDesc.MipLevels = 1;
 	resDesc.SampleDesc.Count = 1;
 	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
@@ -497,7 +499,7 @@ bool Dx12Wrapper::CreateShadowMap()
 	if (!CheckResult(result, "CreateCommittedResource _shadowMap.ReleaseAndGetAddressOf()")) return false;
 
 	// DSV 用ヒープを作る
-	heapDesc.NumDescriptors = 1;
+	heapDesc.NumDescriptors = GameConfig::CascadeCount;
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	result = _dev->CreateDescriptorHeap(
@@ -507,15 +509,22 @@ bool Dx12Wrapper::CreateShadowMap()
 	if (!CheckResult(result, "CreateDescriptorHeap _shadowDSVHeap.ReleaseAndGetAddressOf()")) return false;
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
 	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
 
-	// DSV を作る
-	_dev->CreateDepthStencilView(
-		_shadowMap.Get(),
-		&dsvDesc,
-		_shadowDSVHeap->GetCPUDescriptorHandleForHeapStart()
-	);
+	dsvDesc.Texture2DArray.ArraySize = 1;
+	dsvDesc.Texture2DArray.MipSlice = 0;
+
+	auto dsvH = _shadowDSVHeap->GetCPUDescriptorHandleForHeapStart();
+	const auto incSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
+	for (UINT i = 0; i < GameConfig::CascadeCount; ++i)
+	{
+		dsvDesc.Texture2DArray.FirstArraySlice = i;
+		// DSV を作る
+		_dev->CreateDepthStencilView(_shadowMap.Get(), &dsvDesc, dsvH);
+		dsvH.ptr += incSize;
+	}
 
 	// SRV 用ヒープを作る
 	heapDesc.NumDescriptors = 1;
@@ -528,18 +537,7 @@ bool Dx12Wrapper::CreateShadowMap()
 	);
 	if (!CheckResult(result, "CreateDescriptorHeap _shadowSRVHeap.ReleaseAndGetAddressOf()")) return false;
 
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-	srvDesc.Texture2D.MipLevels = 1;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
-	// SRV を作る
-	_dev->CreateShaderResourceView(
-		_shadowMap.Get(),
-		&srvDesc,
-		_shadowSRVHeap->GetCPUDescriptorHandleForHeapStart()
-	);
+	CreateShadowMapView(_shadowSRVHeap->GetCPUDescriptorHandleForHeapStart());
 
 	return true;
 }
@@ -566,10 +564,13 @@ void Dx12Wrapper::CreateSceneConstantBufferView(D3D12_CPU_DESCRIPTOR_HANDLE hand
 void Dx12Wrapper::CreateShadowMapView(D3D12_CPU_DESCRIPTOR_HANDLE handle)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 	srvDesc.Format = DXGI_FORMAT_R32_FLOAT;   // TYPELESS を数値テクスチャとして読む
-	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Texture2DArray.MostDetailedMip = 0;
+	srvDesc.Texture2DArray.MipLevels = 1;
+	srvDesc.Texture2DArray.FirstArraySlice = 0;
+	srvDesc.Texture2DArray.ArraySize = GameConfig::CascadeCount;
 
 	_dev->CreateShaderResourceView(_shadowMap.Get(), &srvDesc, handle);
 }
@@ -597,7 +598,7 @@ void Dx12Wrapper::SetCamera(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT
 
 	auto* s = Scene();
 	s->view = viewmat;
-	s->proj = projmat;
+	s->viewProj = viewmat * projmat;
 	s->eye = eye;
 }
 
@@ -606,11 +607,6 @@ void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 	auto lightDir = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&_lightVec));
 	const auto up = DirectX::XMVectorSet(0, 1, 0, 0);
 
-	// -- 注視点をテクセル境界に合わせる --
-	  // 光源カメラが中途半端な位置にあると、影の縁のドットが毎フレーム入れ替わってチラつく。
-	  // 光源から見た座標系で丸めてから戻すことで、格子が常に同じ場所に来るようにする
-	const float texelSize = _shadowArea / static_cast<float>(ShadowMapSize);
-
 	// いったん原点を光源から見た向きに変換するための行列（位置は関係ないので原点でよい）
 	auto lightRot = DirectX::XMMatrixLookAtLH(
 		DirectX::XMVectorZero(), lightDir, up);
@@ -618,52 +614,81 @@ void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 	auto centerV = DirectX::XMLoadFloat3(&center);
 	auto centerInLight = DirectX::XMVector3TransformCoord(centerV, lightRot);
 
-	// 光源から見た XY（画面に相当する 2 軸）だけを丸める。Z（奥行き）はそのまま
-	DirectX::XMFLOAT3 snapped;
-	DirectX::XMStoreFloat3(&snapped, centerInLight);
-	snapped.x = floorf(snapped.x / texelSize) * texelSize;
-	snapped.y = floorf(snapped.y / texelSize) * texelSize;
-
-	// ワールド座標へ戻す
-	auto invLightRot = DirectX::XMMatrixInverse(nullptr, lightRot);
-	auto target = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&snapped), invLightRot);
-	auto lightPos = DirectX::XMVectorSubtract(target,
-		DirectX::XMVectorScale(lightDir, _lightDistance));      // 光の手前へ引く(20 くらい)
-
-	auto lightView = DirectX::XMMatrixLookAtLH(lightPos, target, up);
 	constexpr float LightNear = 1.0f;
-	constexpr float LightFar = 100.0f;
+	constexpr float LightFar = 300.0f;
 
-	auto lightProj = DirectX::XMMatrixOrthographicLH(_shadowArea, _shadowArea, LightNear, LightFar);
+	auto invLightRot = DirectX::XMMatrixInverse(nullptr, lightRot);
 
 	auto* s = Scene();
-	s->lightCamera = lightView * lightProj;
+	for (UINT i = 0; i < GameConfig::CascadeCount; ++i)
+	{
+		const float area = GameConfig::CascadeAreas[i] * _shadowAreaScale;
+
+		// -- 注視点をテクセル境界に合わせる --
+		// 光源カメラが中途半端な位置にあると、影の縁のドットが毎フレーム入れ替わってチラつく。
+		// 光源から見た座標系で丸めてから戻すことで、格子が常に同じ場所に来るようにする
+		// テクセルスナップは「そのカスケードの」テクセル幅で行う。
+		// 共通にすると、粗いカスケードの影が毎フレーム踊る
+		const float texelSize = area / static_cast<float>(GameConfig::ShadowMapSize);
+
+		// 光源から見た XY（画面に相当する 2 軸）だけを丸める。Z（奥行き）はそのまま
+		DirectX::XMFLOAT3 snapped;
+		DirectX::XMStoreFloat3(&snapped, centerInLight);
+		snapped.x = floorf(snapped.x / texelSize) * texelSize;
+		snapped.y = floorf(snapped.y / texelSize) * texelSize;
+
+		// ワールド座標へ戻す
+		auto target = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&snapped), invLightRot);
+		auto lightPos = DirectX::XMVectorSubtract(target,
+			DirectX::XMVectorScale(lightDir, _lightDistance));      // 光の手前へ引く(20 くらい)
+
+		auto lightView = DirectX::XMMatrixLookAtLH(lightPos, target, up);
+
+		auto lightProj = DirectX::XMMatrixOrthographicLH(area, area, LightNear, LightFar);
+
+		_lightCamera[i] = lightView * lightProj;
+		s->lightCamera[i] = _lightCamera[i];
+
+		(&s->cascadeNormalOffset.x)[i] = texelSize * 2.0f;
+	}
 	s->lightVec = _lightVec;
-	s->shadowMapTexel = 1.0f / static_cast<float>(ShadowMapSize);
+	s->shadowMapTexel = 1.0f / static_cast<float>(GameConfig::ShadowMapSize);
 	s->lightRange = LightFar - LightNear;
+	// 箱の中心と、カスケードを選ぶ基準を同じ点にする。
+		// ここがずれると「カスケード 0 と判定されたのに箱の外」という場所ができる
+	s->shadowCenter = { center.x, center.y, center.z, 0.0f };
+
+	s->cascadeRadius.x = GameConfig::CascadeAreas[0] * GameConfig::CascadeRadiusRatio * _shadowAreaScale;
+	s->cascadeRadius.y = GameConfig::CascadeAreas[1] * GameConfig::CascadeRadiusRatio * _shadowAreaScale;
+	s->cascadeRadius.z = 0.0f;
+	s->cascadeRadius.w = 0.0f;
+}
+
+void Dx12Wrapper::BeginCascade(UINT c)
+{
+	_currentCascade = c;
+	auto dsvH = _shadowDSVHeap->GetCPUDescriptorHandleForHeapStart();
+	dsvH.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV) * _currentCascade;
+
+	_cmdList->OMSetRenderTargets(0, nullptr, false, &dsvH);
+	_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 }
 
 void Dx12Wrapper::BeginShadowPass()
 {
+	StampGpuTimer(0);
 	// テクスチャとして読める状態 → 描き込める状態へ
 	_barrierDesc.Transition.pResource = _shadowMap.Get();
+	_barrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	_barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	_barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 	_cmdList->ResourceBarrier(1, &_barrierDesc);
 
-	auto dsvH = _shadowDSVHeap->GetCPUDescriptorHandleForHeapStart();
-	_cmdList->OMSetRenderTargets(0, nullptr, false, &dsvH);
-	_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
+	// ビューポートはどのカスケードでも同じなので、ここで 1 回
 	D3D12_VIEWPORT vp = {};
-	vp.Width = static_cast<float>(ShadowMapSize);
-	vp.Height = static_cast<float>(ShadowMapSize);
+	vp.Width = vp.Height = static_cast<float>(GameConfig::ShadowMapSize);
 	vp.MaxDepth = 1.0f;
-
-	D3D12_RECT rect = {};
-	rect.right = ShadowMapSize;
-	rect.bottom = ShadowMapSize;
-
+	D3D12_RECT rect = { 0, 0, GameConfig::ShadowMapSize, GameConfig::ShadowMapSize };
 	_cmdList->RSSetViewports(1, &vp);
 	_cmdList->RSSetScissorRects(1, &rect);
 }
@@ -672,9 +697,11 @@ void Dx12Wrapper::EndShadowPass()
 {
 	// 描き込める状態 → テクスチャとして読める状態へ
 	_barrierDesc.Transition.pResource = _shadowMap.Get();
+	_barrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	_barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 	_barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	_cmdList->ResourceBarrier(1, &_barrierDesc);
+	StampGpuTimer(1);
 }
 
 void Dx12Wrapper::BeginOffscreenPass()
@@ -704,6 +731,7 @@ void Dx12Wrapper::EndOffscreenPass()
 	_barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	_barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	_cmdList->ResourceBarrier(1, &_barrierDesc);
+	StampGpuTimer(2);
 }
 
 void Dx12Wrapper::BeginBackBufferPass()
@@ -736,6 +764,7 @@ void Dx12Wrapper::BeginFrame()
 		_fence->SetEventOnCompletion(f.fenceValue, _fenceEvent);
 		WaitForSingleObject(_fenceEvent, INFINITE);
 	}
+	ReadGpuTimer();
 
 	f.allocator->Reset();
 	_cmdList->Reset(f.allocator.Get(), nullptr);
@@ -749,6 +778,8 @@ void Dx12Wrapper::EndDraw()
 	_barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;	// 今からPRESENT状態
 	_cmdList->ResourceBarrier(1, &_barrierDesc);	// バリア指定実行
 
+	StampGpuTimer(3);
+	ResolveGpuTimer();
 	// 命令のクローズ
 	_cmdList->Close();
 
@@ -808,7 +839,7 @@ ComPtr<ID3D12Resource> Dx12Wrapper::CreateTextureFromMemory(const uint8_t* data,
 	auto img = scratchImg.GetImage(0, 0, 0);	// 生データ抽出
 
 	// WriteToSubresource で転送する用のヒープ設定
-	auto texHeapProp = TextureHeapProperties();
+	auto texheapProp = TextureheapProperties();
 
 	metadata.format = DirectX::MakeSRGB(metadata.format);
 
@@ -827,7 +858,7 @@ ComPtr<ID3D12Resource> Dx12Wrapper::CreateTextureFromMemory(const uint8_t* data,
 	// バッファ作成
 	ComPtr<ID3D12Resource> texbuff;
 	result = _dev->CreateCommittedResource(
-		&texHeapProp,
+		&texheapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
@@ -942,7 +973,7 @@ ID3D12Resource* Dx12Wrapper::GetTextureByPath(const std::string& texPath)
 	auto img = scratchImg.GetImage(0, 0, 0);	// 生データ抽出
 
 	// WriteToSubresource で転送する用のヒープ設定
-	auto texHeapProp = TextureHeapProperties();
+	auto texheapProp = TextureheapProperties();
 
 	D3D12_RESOURCE_DESC resDesc = {};
 	resDesc.Format = metadata.format;
@@ -959,7 +990,7 @@ ID3D12Resource* Dx12Wrapper::GetTextureByPath(const std::string& texPath)
 	// バッファ作成
 	ComPtr<ID3D12Resource> texbuff;
 	result = _dev->CreateCommittedResource(
-		&texHeapProp,
+		&texheapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
@@ -993,12 +1024,12 @@ ID3D12Resource* Dx12Wrapper::GetTextureByPath(const std::string& texPath)
 
 ComPtr<ID3D12Resource> Dx12Wrapper::CreateWhiteTexture()
 {
-	auto texHeapProp = TextureHeapProperties();
+	auto texheapProp = TextureheapProperties();
 	auto resDesc = TextureResourceDesc(4, 4);
 
 	ComPtr<ID3D12Resource> whiteBuff;
 	auto result = _dev->CreateCommittedResource(
-		&texHeapProp,
+		&texheapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
@@ -1025,12 +1056,12 @@ ComPtr<ID3D12Resource> Dx12Wrapper::CreateWhiteTexture()
 
 ComPtr<ID3D12Resource> Dx12Wrapper::CreateBlackTexture()
 {
-	auto texHeapProp = TextureHeapProperties();
+	auto texheapProp = TextureheapProperties();
 	auto resDesc = TextureResourceDesc(4, 4);
 
 	ComPtr<ID3D12Resource> blackBuff;
 	auto result = _dev->CreateCommittedResource(
-		&texHeapProp,
+		&texheapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
@@ -1057,7 +1088,7 @@ ComPtr<ID3D12Resource> Dx12Wrapper::CreateBlackTexture()
 
 ComPtr<ID3D12Resource> Dx12Wrapper::CreateGrayGradationTexture()
 {
-	auto texHeapProp = TextureHeapProperties();
+	auto texheapProp = TextureheapProperties();
 	auto resDesc = TextureResourceDesc(4, 256);
 
 	// 上が白くて下が黒いテクスチャデータを作成
@@ -1074,7 +1105,7 @@ ComPtr<ID3D12Resource> Dx12Wrapper::CreateGrayGradationTexture()
 
 	ComPtr<ID3D12Resource> gradBuff;
 	auto result = _dev->CreateCommittedResource(
-		&texHeapProp,
+		&texheapProp,
 		D3D12_HEAP_FLAG_NONE,
 		&resDesc,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
@@ -1094,4 +1125,86 @@ ComPtr<ID3D12Resource> Dx12Wrapper::CreateGrayGradationTexture()
 	if (!CheckResult(result, "_gradTex->WriteToSubresource")) return nullptr;
 
 	return gradBuff;
+}
+
+bool Dx12Wrapper::CreateGpuTimer()
+{
+	D3D12_QUERY_HEAP_DESC qd = {};
+	qd.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+	qd.Count = MarkerCount * FrameCount;
+	auto r = _dev->CreateQueryHeap(&qd, IID_PPV_ARGS(&_queryHeap));
+	if (!CheckResult(r, "CreateQueryHeap")) return false;
+
+	// READBACK ヒープ：GPU が書き、CPU が読む。UPLOAD のちょうど逆向き
+	D3D12_HEAP_PROPERTIES hp = {};
+	hp.Type = D3D12_HEAP_TYPE_READBACK;
+	hp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	hp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+	D3D12_RESOURCE_DESC rd = {};
+	rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	rd.Width = sizeof(UINT64) * MarkerCount * FrameCount;
+	rd.Height = 1; rd.DepthOrArraySize = 1; rd.MipLevels = 1;
+	rd.Format = DXGI_FORMAT_UNKNOWN;
+	rd.SampleDesc.Count = 1;
+	rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// READBACK ヒープのリソースは COPY_DEST 以外の初期状態を受け付けない。
+	// 以後この状態から動かさないので、バリアも不要
+	r = _dev->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+		D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&_queryReadback));
+	if (!CheckResult(r, "CreateCommittedResource _queryReadback")) return false;
+
+	// カウンタの進む速さ。キューごとに決まっていて、実行中は変わらない
+	r = _cmdQueue->GetTimestampFrequency(&_timestampFreq);
+	if (!CheckResult(r, "GetTimestampFrequency")) return false;
+
+	return true;
+}
+
+void Dx12Wrapper::StampGpuTimer(UINT marker)
+{
+	// タイムスタンプは「区間」ではなく「点」なので、BeginQuery は使わない。
+	// EndQuery だけを呼ぶのが正しい（BeginQuery を呼ぶとデバッグレイヤーが警告を出す）
+	_cmdList->EndQuery(_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
+		_frameIndex * MarkerCount + marker);
+}
+
+void Dx12Wrapper::ResolveGpuTimer()
+{
+	const UINT base = _frameIndex * MarkerCount;
+	// コマンドリストに積む命令なので、必ず Close の前に置く
+	_cmdList->ResolveQueryData(_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
+		base, MarkerCount,
+		_queryReadback.Get(), base * sizeof(UINT64));   // オフセットは 8 の倍数であること
+}
+
+void Dx12Wrapper::ReadGpuTimer()
+{
+	if (_timestampFreq == 0) return;
+
+	// 作ったばかりの READBACK バッファの中身は未定義。
+	// 引き算が巻き戻って数百 ms になるので、一巡するまでは捨てる
+	if (_gpuTimerWarmup < FrameCount + 1) { ++_gpuTimerWarmup; return; }
+
+	const UINT base = _frameIndex * MarkerCount;
+	const SIZE_T head = base * sizeof(UINT64);
+
+	// 読む範囲を正確に伝える。ここを {0,0} にすると「読まない」という宣言になり、
+	// 環境によっては古いキャッシュが返る。UPLOAD で Unmap に {0,0} を渡すのと対の話
+	D3D12_RANGE readRange{ head, head + MarkerCount * sizeof(UINT64) };
+	UINT64* mapped = nullptr;
+	if (FAILED(_queryReadback->Map(0, &readRange, reinterpret_cast<void**>(&mapped)))) return;
+
+	const UINT64* t = mapped + base;
+	const double toMs = 1000.0 / static_cast<double>(_timestampFreq);
+
+	_gpuPassMs[0] = static_cast<float>((t[1] - t[0]) * toMs);   // 影
+	_gpuPassMs[1] = static_cast<float>((t[2] - t[1]) * toMs);   // シーン
+	_gpuPassMs[2] = static_cast<float>((t[3] - t[2]) * toMs);   // ペラ + UI
+	_gpuPassMs[3] = static_cast<float>((t[3] - t[0]) * toMs);   // 合計
+
+	// CPU からは 1 バイトも書いていないので、書き込み範囲は空
+	D3D12_RANGE noWrite{ 0, 0 };
+	_queryReadback->Unmap(0, &noWrite);
 }

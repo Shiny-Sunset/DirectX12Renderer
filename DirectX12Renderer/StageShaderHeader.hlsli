@@ -1,17 +1,20 @@
 cbuffer SceneBuffer : register(b0)
 {
     matrix view;
-    matrix proj;
-    matrix lightCamera;
+    matrix viewProj;
+    matrix lightCamera[3];
     float3 eye;
     float _pad0;
     float3 lightVec;
-    float shadowMapTexel;
+    float shadowMapTexel; // 1 / 2048（全カスケード共通）
+    float4 cascadeRadius; // x, y = 分割距離（ビュー空間 Z）
+    float4 cascadeNormalOffset; // x, y, z = 押し出し量（m）
+    float4 shadowCenter;
     float lightRange;
     float3 _pad1;
 };
 
-Texture2D<float> shadowMap : register(t0); // 深度なので 1 成分
+Texture2DArray<float> shadowMap : register(t0); // 深度なので 1 成分
 StructuredBuffer<matrix> g_instances : register(t1); // 箱ごとのワールド行列
 SamplerComparisonState shadowSmp : register(s0);
 
@@ -20,5 +23,4 @@ struct StageOutput
     float4 svpos : SV_POSITION;
     float3 worldPos : POSITION; // 格子模様を描くのに使う
     float3 normal : NORMAL;
-    float4 tpos : TPOS; // 光源から見た位置
 };

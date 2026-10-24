@@ -15,10 +15,21 @@ void CollisionGrid::Build(const std::vector<CharacterController*>& controllers)
         for (auto& cell : row)
             cell.clear();   // 容量は保持される
 
+    _large.clear();
+
     for (size_t i = 0; i < controllers.size(); ++i)
     {
         // 判定に参加しないものは最初から入れない
         if (!controllers[i]->IsCollisionEnabled()) continue;
+
+        const int idx = static_cast<int>(i);
+
+        // マスより大きいものは 3×3 からはみ出してしまうので、グリッドに入れない
+        if (!IsSmall(controllers[i]->Radius()))
+        {
+            _large.push_back(idx);
+            continue;
+        }
 
         const auto& p = controllers[i]->Position();
         _cells[ToCell(p.x)][ToCell(p.z)].push_back(static_cast<int>(i));

@@ -42,17 +42,28 @@ bool ResolveSphereVsAABB(const Sphere& s, const AABB& b, DirectX::XMFLOAT3& outP
 class CollisionGrid
 {
 public:
-    static constexpr float CellSize = 2.8f;   // 最大半径 1.4m の 2 倍
-    static constexpr int   GridSize = 20;     // 20 × 20 マス = ±28m をカバー
+    // アリの直径 0.6m に合わせる。
+    // 「半径 × 2 ≦ CellSize」を満たすものだけマスに入れる約束なので、
+    // 中心のマス 1 つに登録して 3×3 を見れば取りこぼしが無い
+    static constexpr float CellSize = 1.0f;
+    static constexpr int   GridSize = 56;
+
+    // マスに入れてよい大きさか
+    static bool IsSmall(float radius) { return radius * 2.0f <= CellSize; }
 
     // 判定に参加するものだけを登録し直す（反復ごとに呼ぶ）
+    // マスに入らない大きいものは _large に分けて持つ
     void Build(const std::vector<CharacterController*>& controllers);
 
     // i 番の周囲 3x3 マスにいて、添字が i より大きいものを out に積む
     void GatherCandidates(size_t i, const DirectX::XMFLOAT3& pos, std::vector<int>& out) const;
 
+    // マスに入らなかった大きいもの（王など）。全員と総当たりする
+    const std::vector<int>& LargeIndices() const { return _large; }
+
 private:
     int ToCell(float v) const;   // ワールド座標 → マス番号（範囲外はクランプ）
 
     std::vector<int> _cells[GridSize][GridSize];
+    std::vector<int> _large;
 };

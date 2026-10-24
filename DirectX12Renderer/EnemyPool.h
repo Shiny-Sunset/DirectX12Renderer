@@ -40,6 +40,7 @@ public:
     void Draw();
     void DrawShadow();
     UINT DrawCount() const { return _drawCount; }
+    UINT ShadowCount(UINT c) const { return _visibleCount[c]; }
 
     // 全員を未使用に戻す（リスタート用）
     void ResetAll();
@@ -68,6 +69,9 @@ private:
     D3D12_GPU_VIRTUAL_ADDRESS InstanceAddress() const;
     D3D12_GPU_VIRTUAL_ADDRESS BoneAddress() const;
 
+    bool CastsShadowIn(const GltfActor& actor, UINT cascade) const;
+    D3D12_GPU_VIRTUAL_ADDRESS VisibleAddress(UINT c) const;
+
     Dx12Wrapper& _dx12;
     GltfRenderer& _renderer;
     GltfModel& _model;
@@ -81,12 +85,16 @@ private:
 
     ComPtr<ID3D12Resource> _instanceBuff;   // InstanceData × 定員 × FrameCount
     ComPtr<ID3D12Resource> _boneBuff;       // XMMATRIX × 定員 × ジョイント数 × FrameCount
+    ComPtr<ID3D12Resource> _visibleBuff;   // uint × 定員 × CascadeCount × FrameCount
     uint8_t* _mappedInstance = nullptr;
     uint8_t* _mappedBone = nullptr;
+    uint8_t* _mappedVisible = nullptr;
     UINT _instanceStride = 0;   // 1 フレーム分のバイト数
     UINT _boneStride = 0;
     UINT _jointCount = 0;
     UINT _drawCount = 0;        // このフレームに詰めた数
-
+    UINT _visibleStride = 0;               // 1 カスケード分のバイト数
+    UINT _visibleCount[GameConfig::CascadeCount] = {};
+    std::vector<GltfActor*> _slotActors;
     bool _outlineEnabled = true;
 };

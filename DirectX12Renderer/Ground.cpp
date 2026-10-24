@@ -84,29 +84,29 @@ bool Ground::CreateVertexBuffer()
 
     // -- 頂点バッファの作成 --
     // 頂点ヒープの設定
-    D3D12_HEAP_PROPERTIES heapprop = {};
+    D3D12_HEAP_PROPERTIES heapProp = {};
 
-    heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
-    heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
+    heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
     // リソースの設定
-    D3D12_RESOURCE_DESC resdesc = {};
+    D3D12_RESOURCE_DESC resDesc = {};
 
-    resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resdesc.Width = sizeof(vertices);	// 頂点情報が入るだけのサイズ
-    resdesc.Height = 1;
-    resdesc.DepthOrArraySize = 1;
-    resdesc.MipLevels = 1;
-    resdesc.Format = DXGI_FORMAT_UNKNOWN;
-    resdesc.SampleDesc.Count = 1;
-    resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resDesc.Width = sizeof(vertices);	// 頂点情報が入るだけのサイズ
+    resDesc.Height = 1;
+    resDesc.DepthOrArraySize = 1;
+    resDesc.MipLevels = 1;
+    resDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     auto result = device->CreateCommittedResource(
-        &heapprop,
+        &heapProp,
         D3D12_HEAP_FLAG_NONE,
-        &resdesc,
+        &resDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&_vertBuff)

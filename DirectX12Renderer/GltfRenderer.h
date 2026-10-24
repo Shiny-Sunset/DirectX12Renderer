@@ -28,6 +28,8 @@ public:
 	void BeforeDraw();
 	void BeforeShadowDraw();
 
+	D3D12_GPU_VIRTUAL_ADDRESS IdentityVisibleAddress() const { return _identityVisible->GetGPUVirtualAddress(); }
+
 	ID3D12PipelineState* PipelineState() const { return _pipelineState.Get(); }
 	ID3D12PipelineState* BlendPipelineState() const { return _blendPipelineState.Get(); }
 	ID3D12RootSignature* RootSignature() const { return _rootSignature.Get(); }
@@ -62,4 +64,9 @@ private:
 	ComPtr<ID3D12PipelineState> _blendPipelineState;
 	ComPtr<ID3D12PipelineState> _outlinePipelineState;
 	ComPtr<ID3D12PipelineState> _shadowPipelineState;
+
+	bool CreateIdentityVisible();
+
+	// 影パスで 1 体だけ描くアクター用。中身は { 0 } の固定なので、書いたら Unmap する
+	ComPtr<ID3D12Resource> _identityVisible;
 };

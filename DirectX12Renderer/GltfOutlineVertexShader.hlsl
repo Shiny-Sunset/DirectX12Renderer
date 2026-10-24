@@ -31,6 +31,6 @@ OutlineOutput GltfOutlineVS(
     float3 dir = mul(bm, float4(smoothNormal, 0)).xyz;
     pos.xyz += normalize(dir) * outlineWidth;
 
-    output.svpos = mul(mul(mul(proj, view), world), pos);
+    output.svpos = mul(mul(viewProj, world), pos);
     return output;
 }

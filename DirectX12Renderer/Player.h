@@ -36,6 +36,10 @@ public:
     State CurrentState() const { return _state; }
     const char* StateName() const;
     int HP() const { return _hp; }
+    float HPRate() const {
+        return (GameConfig::Player::MaxHP != 0)
+            ? static_cast<float>(_hp) / GameConfig::Player::MaxHP : 0.0f;
+    }
 
     // -- 当たり判定 --
     Sphere BodySphere() const;     // 自分の体

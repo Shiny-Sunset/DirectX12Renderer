@@ -11,6 +11,8 @@
 #include "Collision.h"
 
 class Dx12Wrapper;
+class FontAtlas;
+class SpriteRenderer;
 class PMDRenderer;
 class PMDActor;
 class GltfRenderer;
@@ -36,6 +38,7 @@ public:
 	{
 		Title,      // タイトル画面。開始待ち
 		Playing,    // プレイ中
+		Paused,
 		// 現仕様では到達しない。アリが無限に湧く防衛ゲームなのでクリア条件が無い
 		// (当初は「敵を全滅させたらクリア」にしていたが、開始直後は敵が 0 匹なので
 		//  即座にクリアになってしまい、条件ごと外した)
@@ -102,10 +105,16 @@ private:
 #else
 	bool _showDebugUI = false;
 #endif
+	enum : UINT { FontSmall = 0, FontLarge = 1 };
 	// デバッグ UI の中身を組み立てる（ImGui::Begin 〜 End）
 	void BuildDebugUI();
 	void BuildProfileUI();
-	void BuildGameUI();
+
+	void DrawGameUI();
+	void DrawHud();
+	void DrawTitle();
+	void DrawPause();
+	void DrawResult();
 
 	void UpdateProfileAverages();
 
@@ -116,6 +125,10 @@ private:
 	// -- 描画（宣言順がそのまま構築順、破棄はその逆順になる） --
 	// アクターは Dx12Wrapper と GltfModel を参照するので、それらを先に宣言する
 	std::unique_ptr<Dx12Wrapper> _dx12;
+	std::unique_ptr<FontAtlas> _fontSmall;
+	std::unique_ptr<FontAtlas> _fontLarge;
+	std::vector<FontAtlas*> _fonts;
+	std::unique_ptr<SpriteRenderer> _ui;
 	std::unique_ptr<DebugUI> _debugUI;
 	std::unique_ptr<GltfRenderer> _gltfRenderer;
 	std::unique_ptr<Ground> _ground;
@@ -175,4 +188,28 @@ private:
 	float _msAIAvg = 0.0f;
 	float _msAnimAvg = 0.0f;
 	float _msRecordAvg = 0.0f;
+	float _msGpuShadowAvg = 0.0f;   // 影パス
+	float _msGpuSceneAvg = 0.0f;    // シーンパス
+	float _msGpuPeraAvg = 0.0f;     // ペラ + UI
+	float _msGpuTotalAvg = 0.0f;    // GPU の合計（影 + シーン + ペラ）
+	float _msColGround = 0.0f;
+	float _msColMove = 0.0f;
+	float _msColStage1 = 0.0f;
+	float _msColPairs = 0.0f;
+	float _msColStage2 = 0.0f;
+	float _msColUnstuck = 0.0f;
+	float _msColGroundAvg = 0.0f;
+	float _msColMoveAvg = 0.0f;
+	float _msColStage1Avg = 0.0f;
+	float _msColPairsAvg = 0.0f;
+	float _msColStage2Avg = 0.0f;
+	float _msColUnstuckAvg = 0.0f;
+	float _msSampleAvg = 0.0f;
+	float _msBoneAvg = 0.0f;
+	float _msInstanceAvg = 0.0f;
+	float _msColBuild = 0.0f;
+	float _msColTest = 0.0f;
+	float _msColBuildAvg = 0.0f;
+	float _msColTestAvg = 0.0f;
+	
 };

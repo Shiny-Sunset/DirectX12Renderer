@@ -1,5 +1,10 @@
 #include "GltfShaderHeader.hlsli"
 
+cbuffer CascadeIndex : register(b1)
+{
+    uint g_cascade;
+};
+
 float4 ShadowVS(
     float4 pos : POSITION,
     float4 normal : NORMAL,
@@ -9,7 +14,7 @@ float4 ShadowVS(
     uint instanceID : SV_InstanceID
 ) : SV_POSITION
 {   
-    InstanceData inst = g_instances[instanceID];
+    InstanceData inst = g_instances[g_visible[instanceID]];
     matrix world = inst.world;
     uint bo = inst.boneOffset;
 
@@ -21,5 +26,5 @@ float4 ShadowVS(
     
     pos = mul(bm, pos);
     pos = mul(world, pos);
-    return mul(lightCamera, pos); // proj × view ではなく lightCamera
+    return mul(lightCamera[g_cascade], pos); // proj × view ではなく lightCamera
 }

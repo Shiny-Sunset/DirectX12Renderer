@@ -13,7 +13,7 @@ Output BasicVS(
     Output output;  // ピクセルシェーダーに渡す値
     pos = mul(bm, pos);
     pos = mul(world, pos);  // この時点で pos はワールド空間
-    output.svpos = mul(mul(proj, view), pos);  // シェーダーでは列優先なのでDirectXと行列の計算する順番が逆になるので注意
+    output.svpos = mul(viewProj, pos); // シェーダーでは列優先なのでDirectXと行列の計算する順番が逆になるので注意
     normal.w = 0;   // ここが重要（法線の平行移動成分は無効にする）
     output.pos = pos;   // ワールド空間の頂点座標
     output.ray = normalize(pos.xyz - eye);

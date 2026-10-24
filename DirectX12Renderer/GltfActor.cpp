@@ -32,6 +32,7 @@ GltfActor::~GltfActor()
 bool GltfActor::Init(bool ownBuffer)
 {
 	_boneMatrices.resize(_model.JointNodes().size());
+	_globals.resize(_model.Nodes().size());
 	if (!CreateTransformBuffer()) return false;
 	_animNodes = _model.Nodes();
 	_blendNodes = _model.Nodes();
@@ -44,6 +45,7 @@ void GltfActor::Update(float deltaTime)
 {
 	if (_currentAnimation >= 0)
 	{
+		AccumTimer t(Profile::msSample);
 		// -- 再生位置を進める --
 		const float duration = _model.Animations()[_currentAnimation].duration;
 		_animTime += deltaTime;
@@ -72,12 +74,12 @@ void GltfActor::Update(float deltaTime)
 		// -- ポーズを作る --
 		if (_prevAnimation < 0)
 		{
-			SampleAnimation(_currentAnimation, _animTime, _animNodes);
+			SampleAnimation(_currentAnimation, _animTime, _animNodes, _animCache);
 		}
 		else
 		{
-			SampleAnimation(_prevAnimation, _prevAnimTime, _blendNodes);   // 移行元
-			SampleAnimation(_currentAnimation, _animTime, _animNodes);     // 移行先
+			SampleAnimation(_prevAnimation, _prevAnimTime, _blendNodes, _blendCache);   // 移行元
+			SampleAnimation(_currentAnimation, _animTime, _animNodes, _animCache);     // 移行先
 
 			// 残り時間が減るほど、移行先の比率が上がる
 			const float weight = 1.0f - (_blendRemain / _blendDuration);
@@ -85,6 +87,7 @@ void GltfActor::Update(float deltaTime)
 		}
 	}
 
+	AccumTimer t(Profile::msBone);
 	UpdateBoneMatrices();
 	UpdateWorldMatrix();
 }
@@ -176,6 +179,7 @@ void GltfActor::DrawShadow()
 	cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
 	cmdList->SetGraphicsRootShaderResourceView(1, InstanceAddress());   // t2
 	cmdList->SetGraphicsRootShaderResourceView(2, BoneAddress());       // t3
+	cmdList->SetGraphicsRootShaderResourceView(4, _renderer.IdentityVisibleAddress());
 
 	cmdList->IASetVertexBuffers(0, 1, &_model.VertexBufferView());
 	cmdList->IASetIndexBuffer(&_model.IndexBufferView());
@@ -192,31 +196,31 @@ void GltfActor::DrawShadow()
 bool GltfActor::CreateTransformBuffer()
 {
 	// ヒープの設定
-	D3D12_HEAP_PROPERTIES transformHeapProp = {};
+	D3D12_HEAP_PROPERTIES transformheapProp = {};
 
-	transformHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;        // CPUからアクセス可能(マップ可能)
-	transformHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	transformHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	transformheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;        // CPUからアクセス可能(マップ可能)
+	transformheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	transformheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// リソースの設定
-	D3D12_RESOURCE_DESC transformResDesc = {};
+	D3D12_RESOURCE_DESC transformresDesc = {};
 
-	transformResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	transformresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	_transformStride = static_cast<UINT>(AlignmentedSize(sizeof(TransformBufferData), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-	transformResDesc.Width = _transformStride * Dx12Wrapper::FrameCount;
-	transformResDesc.Height = 1;                          // 必ず 1
-	transformResDesc.DepthOrArraySize = 1;                // 必ず 1
-	transformResDesc.MipLevels = 1;                       // 必ず 1
-	transformResDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
-	transformResDesc.SampleDesc.Count = 1;                // 必ず 1
-	transformResDesc.SampleDesc.Quality = 0;              // 必ず 0
-	transformResDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
-	transformResDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
+	transformresDesc.Width = _transformStride * Dx12Wrapper::FrameCount;
+	transformresDesc.Height = 1;                          // 必ず 1
+	transformresDesc.DepthOrArraySize = 1;                // 必ず 1
+	transformresDesc.MipLevels = 1;                       // 必ず 1
+	transformresDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
+	transformresDesc.SampleDesc.Count = 1;                // 必ず 1
+	transformresDesc.SampleDesc.Quality = 0;              // 必ず 0
+	transformresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
+	transformresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
 
 	auto result = _dx12.Device()->CreateCommittedResource(
-		&transformHeapProp,
+		&transformheapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&transformResDesc,
+		&transformresDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_transformBuff)
@@ -244,14 +248,19 @@ bool GltfActor::CreateTransformBuffer()
 void GltfActor::UpdateBoneMatrices()
 {
 	// 全ノードのグローバル変換を求める
-	std::vector<DirectX::XMMATRIX> globals(_animNodes.size());
+	auto& globals = _globals;
 	for (int i : _model.NodeOrder())
 	{
 		const GltfModel::Node& n = _animNodes[i];
-		auto local =
-			DirectX::XMMatrixScaling(n.scale.x, n.scale.y, n.scale.z)
-			* DirectX::XMMatrixRotationQuaternion(DirectX::XMLoadFloat4(&n.rotation))
-			* DirectX::XMMatrixTranslation(n.translation.x, n.translation.y, n.translation.z);
+
+		// S * R * T は形が決まっている（S は対角、T は 4 行目だけ）ので、
+		// 回転行列の 0〜2 行目をスケール倍し、4 行目に平行移動を入れれば同じ結果になる。
+	    // 行列積 2 回がベクトル乗算 3 回に減る
+		auto local = DirectX::XMMatrixRotationQuaternion(DirectX::XMLoadFloat4(&n.rotation));
+		local.r[0] = DirectX::XMVectorScale(local.r[0], n.scale.x);
+		local.r[1] = DirectX::XMVectorScale(local.r[1], n.scale.y);
+		local.r[2] = DirectX::XMVectorScale(local.r[2], n.scale.z);
+		local.r[3] = DirectX::XMVectorSet(n.translation.x, n.translation.y, n.translation.z, 1.0f);
 
 		globals[i] = (n.parent < 0) ? local : local * globals[n.parent];
 	}
@@ -293,21 +302,37 @@ void GltfActor::UpdateBoneMatrices()
 	}
 #endif
 }
-void GltfActor::SampleAnimation(int animIndex, float timeSec, std::vector<GltfModel::Node>& out) const
+void GltfActor::SampleAnimation(int animIndex, float timeSec,
+	std::vector<GltfModel::Node>& out, SampleCache& cache) const 
 {
 	// バインドポーズからやり直す（動かさないノードを残すため）
-	out = _model.Nodes();
+	if (animIndex < 0) { out = _model.Nodes(); return; }
 
-	if (animIndex < 0) return;
 	const GltfModel::Animation& anim = _model.Animations()[animIndex];
 
-	for (const auto& ch : anim.channels)
+
+	// -- バインドポーズの復元は、アニメが切り替わったときだけ --
+		// 動かさないノードは誰も書き込まないので、1 度戻せば以後そのまま残る。
+		// 動かすノードは毎フレーム上書きされるので、戻す必要がない
+	if (cache.animIndex != animIndex)
 	{
+		out = _model.Nodes();
+		cache.animIndex = animIndex;
+		cache.cursor.assign(anim.channels.size(), 0);
+	}
+
+	for (size_t c = 0; c < anim.channels.size(); ++c)
+	{
+		const auto& ch = anim.channels[c];
 		if (ch.times.empty()) continue;
 		GltfModel::Node& node = out[ch.targetNode];
 
-		// 現在時刻を挟む 2 キーを探す（times は昇順が保証されている）
-		size_t k1 = 0;
+		// -- 前回見つけた位置から探す --
+		// 再生位置はふつう前へ進むので、たいてい 0〜1 歩で見つかる。
+		// ループで巻き戻ったときだけ先頭からやり直す（自己修復するので、
+		// ループの検出を別に持つ必要がない）
+		size_t& k1 = cache.cursor[c];
+		if (k1 >= ch.times.size() || ch.times[k1] > timeSec) k1 = 0;
 		while (k1 + 1 < ch.times.size() && ch.times[k1 + 1] <= timeSec) ++k1;
 
 		DirectX::XMVECTOR value;

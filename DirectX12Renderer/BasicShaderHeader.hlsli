@@ -16,15 +16,18 @@ Texture2D<float4> toon : register(t3); // 3 番スロットに設定されたテ
 SamplerState smp : register(s0); // 0 番スロット設定されたサンプラー
 SamplerState smpToon : register(s1); // 1 番スロット設定されたサンプラー(トゥーン用)
 
-cbuffer cbuff0 : register(b0)
+cbuffer SceneBuffer : register(b0)
 {
     matrix view;
-    matrix proj;
-    matrix lightCamera;
+    matrix viewProj;
+    matrix lightCamera[3];
     float3 eye;
     float _pad0;
     float3 lightVec;
-    float shadowMapTexel;
+    float shadowMapTexel; // 1 / 2048（全カスケード共通）
+    float4 cascadeRadius; // x, y = 分割距離（ビュー空間 Z）
+    float4 cascadeNormalOffset; // x, y, z = 押し出し量（m）
+    float4 shadowCenter;
     float lightRange;
     float3 _pad1;
 };

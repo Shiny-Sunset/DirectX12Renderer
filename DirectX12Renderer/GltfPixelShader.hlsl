@@ -25,8 +25,23 @@ float4 GltfPS(Output input) : SV_TARGET
     float f = halfLambert * steps;
     float toon = saturate((floor(f) + smoothstep(0.0, 0.08, frac(f))) / (steps - 1.0));
     
+    // 箱と同じ中心からの距離で選ぶ。
+    // 箱は光源方向に対して垂直な正方形なので、半径 area/2 の球は必ず中に収まる
+    float d = length(input.worldPos - shadowCenter.xyz);
+    uint c = 0;
+    if (d > cascadeRadius.x)
+        c = 1;
+    if (d > cascadeRadius.y)
+        c = 2;
+
+    // カスケードごとにテクセルの実寸が違うので、押し出す量も変える
+    const float normalOffset = cascadeNormalOffset[c];
+    
+    float3 biased = input.worldPos + normal * normalOffset;
+    float4 tpos = mul(lightCamera[c], float4(biased, 1.0));
+    
     // 影の中かどうかを調べる
-    float lit = ComputeShadowLit(input.tpos, ndotl, shadowMap, shadowSmp);
+    float lit = ComputeShadowLit(tpos, ndotl, c, shadowMap, shadowSmp);
     
     // 影に入っていたら、トゥーンの暗い側へ寄せる
     // min を使うのは、階調を保ったまま「暗い方を採用」するため

@@ -20,6 +20,10 @@ public:
 
     // -- 状態の取得 --
     int HP() const { return _hp; }
+    float HPRate() const {
+        return (_maxHP != 0)
+            ? static_cast<float>(_hp) / _maxHP : 0.0f;
+    }
     void SetMaxHP(int hp) { _maxHP = hp; }
     int MaxHP() const { return _maxHP; }
     bool IsDestroyed() const { return _hp <= 0; }

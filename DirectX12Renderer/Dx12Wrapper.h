@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 #include <cassert>
+#include "GameConfig.h"
 
 // DirectX12 の基盤部分をまとめたクラス
 // デバイス、スワップチェーン、コマンド関連、レンダーターゲット、深度バッファ、
@@ -28,6 +29,11 @@ public:
 	Dx12Wrapper(const Dx12Wrapper&) = delete;
 	Dx12Wrapper& operator=(const Dx12Wrapper&) = delete;
 
+	enum class GpuPass { Shadow, Scene, Pera, Total, Count };
+
+	// 直前に完了したフレームの、パスごとの GPU 時間（ミリ秒）
+	float GpuPassTime(GpuPass p) const { return _gpuPassMs[static_cast<size_t>(p)]; }
+
 	// 初期化
 	// @param hwnd 描画先のウィンドウハンドル
 	// @param windowWidth ウィンドウ幅
@@ -35,12 +41,19 @@ public:
 	// @return 成功したら true
 	bool Init(HWND hwnd, int windowWidth, int windowHeight);
 
+	static constexpr UINT BufferCount = 3;
+
+	int WindowWidth() const { return _windowWidth; }
+	int WindowHeight() const { return _windowHeight; }
+
 	// ------------------------------------------------------------
 	// 描画パスの制御
 	// ------------------------------------------------------------
 	// 各 Begin〜 はリソースバリアの遷移、描画先の設定、クリア、
 	// ビューポートとシザー矩形の設定までを行う
 
+	void BeginCascade(UINT c);
+	UINT CurrentCascade() const { return _currentCascade; }
 	void BeginShadowPass();      // 0 パス目：シャドウマップへ描き始める
 	void EndShadowPass();        // 深度テクスチャとして読める状態へ戻す
 
@@ -80,12 +93,16 @@ public:
 	void SetLightVec(const DirectX::XMFLOAT3& v) { _lightVec = v; }
 	const DirectX::XMFLOAT3& LightVec() const { return _lightVec; }
 
+	// 影パスの絞り込みに使う。
+	// UPLOAD ヒープは読み出しが極端に遅いので、CPU 側で使う分は控えを持つ
+	const DirectX::XMMATRIX& LightCamera(UINT cascade) const { return _lightCamera[cascade]; }
+
 	void SetLightDistance(float d) { _lightDistance = d; }
 	float LightDistance() const { return _lightDistance; }
 
 	// 影を落とす範囲（m）。狭めるほど影が精細になる
-	void SetShadowArea(float area) { _shadowArea = area; }
-	float ShadowArea() const { return _shadowArea; }
+	void SetShadowAreaScale(float areaScale) { _shadowAreaScale = areaScale; }
+	float ShadowAreaScale() const { return _shadowAreaScale; }
 
 	// ------------------------------------------------------------
 	// シーン用定数バッファ(b0)の受け渡し
@@ -103,7 +120,7 @@ public:
 		return _sceneConstBuff->GetGPUVirtualAddress() + _frameIndex * _sceneCBStride;
 	}
 
-	static constexpr UINT FrameCount = 1;
+	static constexpr UINT FrameCount = 2;
 	UINT FrameIndex() const { return _frameIndex; }
 
 	// ------------------------------------------------------------
@@ -165,18 +182,28 @@ private:
 	// 16 バイト境界をまたげないため（C++ 側と配置がずれる）
 	struct SceneMatrix
 	{
-		DirectX::XMMATRIX view;          // ビュー行列
-		DirectX::XMMATRIX proj;          // プロジェクション行列
-		DirectX::XMMATRIX lightCamera;   // 光源から見たビュー×プロジェクション
+		DirectX::XMMATRIX view;          // ビュー行列（PMD のスフィアマップ用）
+		DirectX::XMMATRIX viewProj;      // ビュー × プロジェクション
+		DirectX::XMMATRIX lightCamera[3];   // 光源から見たビュー×プロジェクション
 		DirectX::XMFLOAT3 eye;           // 視点座標
 		float _pad0;
 		DirectX::XMFLOAT3 lightVec;      // 光が進む向き
 		float shadowMapTexel;            // シャドウマップ 1 テクセルの UV 幅（1 / 解像度）
+		DirectX::XMFLOAT4 cascadeRadius;        // x,y,z = 各カスケードの終端距離（ビュー空間 Z）
+		DirectX::XMFLOAT4 cascadeNormalOffset;
+		DirectX::XMFLOAT4 shadowCenter;
 		float lightRange;                // 光源カメラの深度範囲（far - near）
 		float _pad1[3];
 	};
 
 	static_assert(sizeof(SceneMatrix) % 16 == 0, "HLSL の定数バッファは 16 バイト単位で詰まる");
+
+	// 1 フレームあたりのタイムスタンプの本数（パス境界の数）
+	static constexpr UINT MarkerCount = 4;
+
+	void StampGpuTimer(UINT marker);
+	void ResolveGpuTimer();     // EndDraw の中
+	void ReadGpuTimer();
 
 	// 1 フレーム分の、CPU と GPU で取り合いになるリソース
 	struct FrameResource
@@ -184,9 +211,6 @@ private:
 		ComPtr<ID3D12CommandAllocator> allocator;
 		UINT64 fenceValue = 0;   // このフレームの描画完了を表すフェンスの値
 	};
-
-	// シャドウマップの解像度
-	static constexpr UINT ShadowMapSize = 2048;
 
 	// -- 初期化のサブルーチン（Init から順に呼ばれる） --
 	bool InitializeDXGIDevice();
@@ -198,6 +222,7 @@ private:
 	bool CreateDefaultTextures();
 	bool CreatePeraResources();
 	bool CreateShadowMap();
+	bool CreateGpuTimer();
 
 	// 既定テクスチャの生成
 	ComPtr<ID3D12Resource> CreateWhiteTexture();
@@ -247,8 +272,9 @@ private:
 
 	// -- 平行光源 --
 	DirectX::XMFLOAT3 _lightVec = { 1.0f, -1.0f, 1.0f };   // 光が進む向き（斜め上から）
-	float _lightDistance = 20.0f;   // 注視点から光源を引く距離
-	float _shadowArea = 25.0f;      // 影を落とす範囲（m 四方）
+	float _lightDistance = 150.0f;   // 注視点から光源を引く距離
+	DirectX::XMMATRIX _lightCamera[GameConfig::CascadeCount];
+	float _shadowAreaScale = 1.0f;      // 影を落とす範囲の倍率
 
 	// -- テクスチャ --
 	ComPtr<ID3D12Resource> _whiteTex;
@@ -271,4 +297,11 @@ private:
 	FrameResource _frames[FrameCount];
 	UINT _frameIndex = 0;
 	HANDLE _fenceEvent = nullptr;
+
+	ComPtr<ID3D12QueryHeap> _queryHeap;
+	ComPtr<ID3D12Resource> _queryReadback;
+	UINT64 _timestampFreq = 0;        // 1 秒あたりのカウント数
+	UINT _gpuTimerWarmup = 0;
+	float _gpuPassMs[static_cast<size_t>(GpuPass::Count)] = {};
+	UINT _currentCascade = 0;
 };

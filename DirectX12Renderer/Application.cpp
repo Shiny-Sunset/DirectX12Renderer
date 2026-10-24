@@ -1,5 +1,8 @@
 ﻿#include "Application.h"
 #include "Dx12Wrapper.h"
+#include "UIText.h"
+#include "FontAtlas.h"
+#include "SpriteRenderer.h"
 #include "PMDActor.h"
 #include "PMDRenderer.h"
 #include "GltfModel.h"
@@ -60,6 +63,23 @@ namespace
 	constexpr DirectX::XMFLOAT3 PlayerSpawn = { -2.0f, 0.0f, 0.0f };
 
 	constexpr DirectX::XMFLOAT3 KingPosition = { 0.0f, 0.0f, 0.0f };
+}
+
+static std::wstring BuildCharset()
+{
+	std::wstring s;
+
+	// ASCII の印字可能文字。数字と記号は swprintf_s でいつでも出てくるので全部入れる
+	for (wchar_t c = L' '; c <= L'~'; ++c) s += c;
+
+	// 画面に出す文字列に含まれる文字
+	for (const wchar_t* t : UIText::All) s += t;
+
+	// 重複を消す。アトラスを無駄に埋めないため
+	std::sort(s.begin(), s.end());
+	s.erase(std::unique(s.begin(), s.end()), s.end());
+
+	return s;
 }
 
 Application& Application::Instance()
@@ -133,6 +153,19 @@ bool Application::Init()
 	// -- DirectX12 の初期化 --
 	_dx12 = std::make_unique<Dx12Wrapper>();
 	if (!_dx12->Init(_hwnd, window_width, window_height)) return false;
+
+	// -- フォント --
+	_fontSmall = std::make_unique<FontAtlas>(*_dx12);
+	if (!_fontSmall->Build(L"Meiryo", 28, BuildCharset())) return false;
+	_fonts.push_back(_fontSmall.get());
+
+	_fontLarge = std::make_unique<FontAtlas>(*_dx12);
+	if (!_fontLarge->Build(L"Meiryo", 64, BuildCharset(), 2048)) return false;
+	_fonts.push_back(_fontLarge.get());
+
+	// -- UI --（SRV がフォントのテクスチャを指すので、Build のあとで作る）
+	_ui = std::make_unique<SpriteRenderer>(*_dx12, _fonts);
+	if (!_ui->Init()) return false;
 
 	// -- デバッグ UI --
 	_debugUI = std::make_unique<DebugUI>(*_dx12);
@@ -276,7 +309,22 @@ void Application::Run()
 			}
 			break;
 
+		case GameState::Playing:
+			if (uiFree && _input.IsTriggered(VK_ESCAPE))
+			{
+				ChangeGameState(GameState::Paused);
+			}
+			break;
+
+		case GameState::Paused:
+			if (uiFree && _input.IsTriggered(VK_ESCAPE))
+			{
+				ChangeGameState(GameState::Playing);
+			}
+			break;
+
 		case GameState::Clear:
+			break;
 		case GameState::GameOver:
 			// 押しっぱなしで即スキップされないよう、少し待ってから受け付ける
 			if (_gameStateTime > 1.0f && uiFree && _input.IsTriggered('R'))
@@ -284,7 +332,6 @@ void Application::Run()
 				RestartGame();
 			}
 			break;
-
 		default:
 			break;
 		}
@@ -307,16 +354,19 @@ void Application::Run()
 			{
 				ScopedTimer t(_msCollision);
 				// 床の高さを先に教えてから動かす
-				for (auto& c : _allControllers)
 				{
-					const auto& p = c->Position();   // または既存の取得方法
-					c->SetGroundHeight(_stage->GroundHeightAt(p.x, p.z, p.y + 0.05f));
+					ScopedTimer t2(_msColGround);
+					for (auto& c : _allControllers)
+					{
+						const auto& p = c->Position();
+						c->SetGroundHeight(_stage->GroundHeightAt(p.x, p.z, p.y + 0.05f));
+					}
 				}
-				for (auto& c : _allControllers) c->Update(dt);	// コリジョン更新
-				for (auto& c : _allControllers) _stage->Resolve(*c);
-				ResolveCollisions();	// 重なりの解消
-				for (auto& c : _allControllers) _stage->Resolve(*c);
-				for (auto& c : _allControllers) _stage->Unstuck(*c);
+				{ ScopedTimer t2(_msColMove);    for (auto& c : _allControllers) c->Update(dt); }
+				{ ScopedTimer t2(_msColStage1);  for (auto& c : _allControllers) _stage->Resolve(*c); }
+				{ ScopedTimer t2(_msColPairs);   ResolveCollisions(); }
+				{ ScopedTimer t2(_msColStage2);  for (auto& c : _allControllers) _stage->Resolve(*c); }
+				{ ScopedTimer t2(_msColUnstuck); for (auto& c : _allControllers) _stage->Unstuck(*c); }
 			}
 
 			// 敵の攻撃が王やプレイヤーに当たっているか
@@ -352,7 +402,7 @@ void Application::Run()
 
 			CheckGameEnd();
 		}
-		else
+		else if (_gameState != GameState::Paused)
 		{
 			// タイトル・結果画面では、王の周りをゆっくり回す
 			constexpr float Radius = 14.0f;
@@ -371,6 +421,7 @@ void Application::Run()
 		const float animDt = (_gameState == GameState::Playing) ? dt : 0.0f;
 		{
 			ScopedTimer t(_msAnim);
+			Profile::Reset();
 			for (auto& actor : _gltfActors) actor->Update(animDt);	// 実際に動かす
 			_enemyPool->UpdateActors(animDt);
 		}
@@ -385,7 +436,6 @@ void Application::Run()
 		_debugUI->BeginFrame();
 		if (_showDebugUI) BuildDebugUI();
 		BuildProfileUI();
-		BuildGameUI();
 		_debugUI->EndFrame();
 
 		// -- 描画処理 --
@@ -393,10 +443,14 @@ void Application::Run()
 			ScopedTimer t(_msRecord);
 			// -- 0 パス目：影 --
 			_dx12->BeginShadowPass();
-			_gltfRenderer->BeforeShadowDraw();
-			for (auto& actor : _gltfActors) actor->DrawShadow();
-			_enemyPool->DrawShadow();
-			_stage->DrawShadow();
+			for (UINT c = 0; c < GameConfig::CascadeCount; ++c)
+			{
+				_dx12->BeginCascade(c);
+				_gltfRenderer->BeforeShadowDraw();
+				for (auto& actor : _gltfActors) actor->DrawShadow();
+				_enemyPool->DrawShadow();
+				_stage->DrawShadow();
+			}
 			_dx12->EndShadowPass();
 
 			// -- 1 パス目：シーンをテクスチャへ --
@@ -418,6 +472,11 @@ void Application::Run()
 			// -- 2 パス目：テクスチャを画面へ --
 			_dx12->BeginBackBufferPass();
 			_pera->Draw();        // 画面いっぱいの板ポリ
+
+			_ui->Begin();
+			DrawGameUI();
+			_ui->Draw();
+
 			_debugUI->Draw();     // UI は効果の影響を受けない
 			_dx12->EndDraw();
 			_dx12->Flip();
@@ -486,7 +545,9 @@ void Application::BuildDebugUI()
 
 	ImGui::Separator();
 	ImGui::Text("Enemies");
-	ImGui::Text("Alive: %d / %zu", _enemyPool->AliveCount(), _enemyPool->Size());
+	ImGui::Text("Ants %d / %d", _enemyPool->AliveCount(), _tuning.enemyLimit);
+	ImGui::Text("Draw %u  Shadow %u / %u / %u", _enemyPool->DrawCount(),
+		_enemyPool->ShadowCount(0), _enemyPool->ShadowCount(1), _enemyPool->ShadowCount(2));
 	ImGui::Text("Kills: %d", _killCount);
 	ImGui::Text("Time:  %.1f s", _survivedTime);
 
@@ -537,10 +598,10 @@ void Application::BuildDebugUI()
 		_dx12->SetLightVec(dir);
 	}
 
-	float shadowArea = _dx12->ShadowArea();
-	if (ImGui::SliderFloat("Shadow Area", &shadowArea, 4.0f, 40.0f))
+	float shadowArea = _dx12->ShadowAreaScale();
+	if (ImGui::SliderFloat("Shadow Area Scale", &shadowArea, 0.1f, 3.0f))
 	{
-		_dx12->SetShadowArea(shadowArea);
+		_dx12->SetShadowAreaScale(shadowArea);
 	}
 
 	ImGui::Separator();
@@ -670,125 +731,237 @@ void Application::BuildProfileUI()
 
 	ImGui::Text("%.1f FPS (%.2f ms)", io.Framerate, 1000.0f / io.Framerate);
 	ImGui::Text("GPU wait %.3f / CPU %.3f", _msGpuWaitAvg, cpu);
+	ImGui::Text("GPU %.3f = Shadow %.3f + Scene %.3f + Pera %.3f",
+		_msGpuTotalAvg, _msGpuShadowAvg, _msGpuSceneAvg, _msGpuPeraAvg);
 	ImGui::Text("AI %.3f  Col %.3f", _msAIAvg, _msCollisionAvg);
+	ImGui::Text("  Ground %.3f  Move %.3f  Stage1 %.3f",
+		_msColGroundAvg, _msColMoveAvg, _msColStage1Avg);
+	ImGui::Text("Anim %.3f = Sample %.3f + Bone %.3f + Inst %.3f",
+		_msAnimAvg, _msSampleAvg, _msBoneAvg, _msInstanceAvg);
+	ImGui::Text("  Pairs %.3f (Build %.3f + Test %.3f)  Stage2 %.3f  Unstuck %.3f",
+		_msColPairsAvg, _msColBuildAvg, _msColTestAvg, _msColStage2Avg, _msColUnstuckAvg);
+	ImGui::Text("Frames in flight %u  ShadowMap %u  BufferCount %u", Dx12Wrapper::FrameCount, GameConfig::ShadowMapSize, Dx12Wrapper::BufferCount);
 	ImGui::Text("Anim %.3f  Rec %.3f", _msAnimAvg, _msRecordAvg);
 	ImGui::Text("Ants %d / %d", _enemyPool->AliveCount(), _tuning.enemyLimit);
 
 	ImGui::End();
 }
 
-void Application::BuildGameUI()
+void Application::DrawGameUI()
 {
-	const auto& io = ImGui::GetIO();
-
-	// -- プレイ中の情報表示（左上） --
-	if (_gameState == GameState::Playing)
+	switch (_gameState)
 	{
-		ImGui::SetNextWindowPos(ImVec2(20, 20));
-		ImGui::Begin("HUD", nullptr,
-			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-			ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs);
-
-		ImGui::Text("KING  %d / %d", _king->HP(), _king->MaxHP());
-		ImGui::Text("HP    %d", _playerLogic->HP());
-		ImGui::Text("TIME  %.1f", _survivedTime);
-		ImGui::Text("KILL  %d", _killCount);
-
-		ImGui::End();
-		return;
+	case GameState::Playing: DrawHud();    break;   // いまの中身をここへ
+	case GameState::Title:   DrawTitle();  break;
+	case GameState::Paused:  DrawPause();  break;
+	default:                 DrawResult(); break;   // Clear / GameOver
 	}
-	// -- 中央のメッセージ --
-	ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
-		ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-	ImGui::Begin("Message", nullptr,
-		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
-		ImGuiWindowFlags_NoBackground);
-	if (_gameState == GameState::Title)
+}
+
+void Application::DrawHud()
+{
+	const auto white = SrgbColor(255, 255, 255);
+	const auto black = SrgbColor(0, 0, 0);
+	const auto back = SrgbColor(20, 20, 20, 0.55f);
+	const auto kingBar = SrgbColor(230, 90, 80);
+	const auto hpOn = SrgbColor(90, 220, 120);
+	const auto hpOff = SrgbColor(60, 60, 60, 0.6f);
+
+	constexpr float X = 40.0f, Y = 40.0f;
+	constexpr float BarW = 320.0f, BarH = 22.0f;
+
+	// 四角をまとめて積む（バッチを 2 つで済ませるため、文字より先に）
+	_ui->FillRect(X, Y, BarW, BarH, back);
+	_ui->FillRect(X, Y, BarW * _king->HPRate(), BarH, kingBar);
+
+	for (int i = 0; i < GameConfig::Player::MaxHP; ++i)
 	{
-		ImGui::SetWindowFontScale(3.0f);
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "DANGO DEFENSE");
-
-		ImGui::SetWindowFontScale(1.2f);
-		ImGui::Text(" ");
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "Protect the King from the ants!");
-		ImGui::Text(" ");
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "WASD    Move        Shift  Run");
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "Space   Jump        Click  Attack");
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "Mouse Right Drag    Camera");
-		ImGui::TextColored(ImVec4(0.0f, 0.0f, 0.0f, 1.0f), "F1      Debug Menu");
-		ImGui::Text(" ");
-
-		ImGui::SetWindowFontScale(1.5f);
-		ImGui::Text("Press SPACE to start");
-	}
-	else   // Clear / GameOver
-	{
-		ImGui::SetWindowFontScale(3.0f);
-		ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "GAME OVER");
-
-		ImGui::SetWindowFontScale(1.5f);
-		ImGui::Text(" ");
-		ImGui::Text("TIME     %6.1f s   x%d", _survivedTime, PointPerSecond);
-		ImGui::Text("KILLS    %6d      x%d", _killCount, PointPerKill);
-		ImGui::Separator();
-
-		ImGui::SetWindowFontScale(2.0f);
-		ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.3f, 1.0f), "SCORE    %6d", CalcScore());
-
-		ImGui::SetWindowFontScale(1.2f);
-		if (CalcScore() >= _highScore && _highScore > 0)
-		{
-			ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "NEW RECORD!");
-		}
-		else
-		{
-			ImGui::Text("BEST     %6d", _highScore);
-		}
-
-		ImGui::Text(" ");
-		ImGui::Text("Press R to retry");
+		_ui->FillRect(X + i * 28.0f, Y + 32.0f, 22.0f, 22.0f,
+			(i < _playerLogic->HP()) ? hpOn : hpOff);
 	}
 
-	ImGui::End();
+	// 文字をまとめて積む
+	wchar_t buf[64];
+	const float lh = static_cast<float>(_ui->LineHeight(FontSmall));
+
+	swprintf_s(buf, L"%s  %d / %d", UIText::HudKing, _king->HP(), _king->MaxHP());
+	_ui->DrawStringOutlined(FontSmall, X + BarW + 16.0f, Y, buf, white, black);
+
+	swprintf_s(buf, L"%s  %.1f", UIText::HudTime, _survivedTime);
+	_ui->DrawStringOutlined(FontSmall, X, Y + 70.0f, buf, white, black);
+
+	swprintf_s(buf, L"%s  %d", UIText::HudKill, _killCount);
+	_ui->DrawStringOutlined(FontSmall, X, Y + 70.0f + lh, buf, white, black);
+}
+
+void Application::DrawTitle()
+{
+	const float cx = _dx12->WindowWidth() * 0.5f;
+	const float h = static_cast<float>(_dx12->WindowHeight());
+
+	const auto white = SrgbColor(255, 255, 255);
+	const auto black = SrgbColor(0, 0, 0);
+
+	_ui->DrawStringCentered(FontLarge, cx, h * 0.22f, UIText::Title, white, black);
+	_ui->DrawStringCentered(FontSmall, cx, h * 0.40f, UIText::Subtitle, white, black);
+
+	const float lh = static_cast<float>(_ui->LineHeight(FontSmall));
+	float y = h * 0.52f;
+	for (const wchar_t* line : { UIText::HelpMove, UIText::HelpJump, UIText::HelpCam })
+	{
+		_ui->DrawStringCentered(FontSmall, cx, y, line, white, black);
+		y += lh * 1.3f;
+	}
+
+	// 点滅させる
+	const float blink = 0.55f + 0.45f * sinf(_gameStateTime * 4.0f);
+	_ui->DrawStringCentered(FontSmall, cx, h * 0.80f, UIText::Start,
+		SrgbColor(255, 255, 255, blink), SrgbColor(0, 0, 0, blink));
+}
+
+void Application::DrawPause()
+{
+	const float w = static_cast<float>(_dx12->WindowWidth());
+	const float h = static_cast<float>(_dx12->WindowHeight());
+
+	_ui->FillRect(0, 0, w, h, SrgbColor(0, 0, 0, 0.45f));
+
+	_ui->DrawStringCentered(FontLarge, w * 0.5f, h * 0.40f, UIText::Pause,
+		SrgbColor(255, 255, 255), SrgbColor(0, 0, 0));
+	_ui->DrawStringCentered(FontSmall, w * 0.5f, h * 0.55f, UIText::Resume,
+		SrgbColor(220, 220, 220), SrgbColor(0, 0, 0));
+}
+
+void Application::DrawResult()
+{
+	const float w = static_cast<float>(_dx12->WindowWidth());
+	const float h = static_cast<float>(_dx12->WindowHeight());
+	const float cx = w * 0.5f;
+	const float lh = static_cast<float>(_ui->LineHeight(FontSmall));
+
+	const auto white = SrgbColor(255, 255, 255);
+	const auto black = SrgbColor(0, 0, 0);
+
+	// ① 暗転
+	_ui->FillRect(0, 0, w, h, SrgbColor(0, 0, 0, 0.55f));
+
+	// ② 文字
+	_ui->DrawStringCentered(FontLarge, cx, h * 0.22f, UIText::GameOver,
+		SrgbColor(240, 90, 90), black);
+
+	wchar_t buf[96];
+	float y = h * 0.42f;
+
+	swprintf_s(buf, L"%s   %.1f %s   x%d", UIText::HudTime, _survivedTime,
+		UIText::UnitSec, PointPerSecond);
+	_ui->DrawStringCentered(FontSmall, cx, y, buf, white, black);
+	y += lh * 1.3f;
+
+	swprintf_s(buf, L"%s   %d   x%d", UIText::HudKill, _killCount, PointPerKill);
+	_ui->DrawStringCentered(FontSmall, cx, y, buf, white, black);
+	y += lh * 2.0f;
+
+	swprintf_s(buf, L"%s   %d", UIText::Score, CalcScore());
+	_ui->DrawStringCentered(FontLarge, cx, y, buf, SrgbColor(255, 225, 80), black);
+	y += _ui->LineHeight(FontLarge) * 1.2f;
+
+	if (CalcScore() >= _highScore && _highScore > 0)
+	{
+		_ui->DrawStringCentered(FontSmall, cx, y, UIText::NewRecord,
+			SrgbColor(110, 255, 140), black);
+	}
+	else
+	{
+		swprintf_s(buf, L"%s   %d", UIText::Best, _highScore);
+		_ui->DrawStringCentered(FontSmall, cx, y, buf, white, black);
+	}
+	y += lh * 2.0f;
+
+	if (_gameStateTime > 1.0f)   // 入力を受け付けるのと同じ条件で出す
+	{
+		_ui->DrawStringCentered(FontSmall, cx, y, UIText::Retry, white, black);
+	}
 }
 
 void Application::UpdateProfileAverages()
 {
-	constexpr float k = 0.05f;   // 小さいほど滑らか
+	const float dt = _timer.RawDeltaTime();
+	float k = 1 - expf(-dt / 0.2f);   // 小さいほど滑らか
 	_msGpuWaitAvg = _msGpuWaitAvg * (1.0f - k) + _msGpuWait * k;
 	_msAIAvg = _msAIAvg * (1.0f - k) + _msAI * k;
 	_msCollisionAvg = _msCollisionAvg * (1.0f - k) + _msCollision * k;
 	_msAnimAvg = _msAnimAvg * (1.0f - k) + _msAnim * k;
 	_msRecordAvg = _msRecordAvg * (1.0f - k) + _msRecord * k;
+	using GP = Dx12Wrapper::GpuPass;
+	_msGpuShadowAvg = _msGpuShadowAvg * (1.0f - k) + _dx12->GpuPassTime(GP::Shadow) * k;
+	_msGpuSceneAvg = _msGpuSceneAvg * (1.0f - k) + _dx12->GpuPassTime(GP::Scene) * k;
+	_msGpuPeraAvg = _msGpuPeraAvg * (1.0f - k) + _dx12->GpuPassTime(GP::Pera) * k;
+	_msGpuTotalAvg = _msGpuTotalAvg * (1.0f - k) + _dx12->GpuPassTime(GP::Total) * k;
+	_msColGroundAvg = _msColGroundAvg * (1.0f - k) + _msColGround * k;
+	_msColMoveAvg = _msColMoveAvg * (1.0f - k) + _msColMove * k;
+	_msColStage1Avg = _msColStage1Avg * (1.0f - k) + _msColStage1 * k;
+	_msColPairsAvg = _msColPairsAvg * (1.0f - k) + _msColPairs * k;
+	_msColStage2Avg = _msColStage2Avg * (1.0f - k) + _msColStage2 * k;
+	_msColUnstuckAvg = _msColUnstuckAvg * (1.0f - k) + _msColUnstuck * k;
+
+	_msSampleAvg = _msSampleAvg * (1.0f - k) + Profile::msSample * k;
+	_msBoneAvg = _msBoneAvg * (1.0f - k) + Profile::msBone * k;
+	_msInstanceAvg = _msInstanceAvg * (1.0f - k) + Profile::msInstance * k;
+
+	_msColBuildAvg = _msColBuildAvg * (1.0f - k) + _msColBuild * k;
+	_msColTestAvg = _msColTestAvg * (1.0f - k) + _msColTest * k;
+}
+
+// 2 体の重なりを、押しの強さの比で分け合って解消する
+static void PushApart(CharacterController& a, CharacterController& b)
+{
+	float pushX = 0.0f, pushZ = 0.0f;
+	if (!ResolveXZ(a.BodySphere(), b.BodySphere(), pushX, pushZ)) return;
+
+	const float total = a.PushWeight() + b.PushWeight();
+	if (total <= 0.0f) return;
+
+	a.PushXZ(pushX * (b.PushWeight() / total), pushZ * (b.PushWeight() / total));
+	b.PushXZ(-pushX * (a.PushWeight() / total), -pushZ * (a.PushWeight() / total));
 }
 
 void Application::ResolveCollisions()
 {
 	constexpr int Iterations = 3;
+	_msColBuild = 0.0f;   // 3 反復ぶん足し込むので先に 0 へ
+	_msColTest = 0.0f;
 	for (int iter = 0; iter < Iterations; ++iter)
 	{
-		_collisionGrid.Build(_allControllers);
+		{ AccumTimer t(_msColBuild); _collisionGrid.Build(_allControllers); }
+		AccumTimer t(_msColTest);
 		
+		// マスに入った小さいもの同士
 		for (size_t i = 0; i < _allControllers.size(); ++i)
 		{
 			auto& a = *_allControllers[i];
 			if (!a.IsCollisionEnabled()) continue;
+			if (!CollisionGrid::IsSmall(a.Radius())) continue;   // 大きいものは で
 
 			_collisionGrid.GatherCandidates(i, a.Position(), _candidates);
+			for (int j : _candidates) PushApart(a, *_allControllers[j]);
+		}
 
-			for (int j : _candidates)
+		// マスに入らなかった大きいものは、全員と総当たり
+		// 王など数体しかいないので、500 体と当てても誤差にならない
+		for (int li : _collisionGrid.LargeIndices())
+		{
+			auto& a = *_allControllers[li];
+			for (size_t j = 0; j < _allControllers.size(); ++j)
 			{
+				if (static_cast<int>(j) == li) continue;
+
 				auto& b = *_allControllers[j];
+				if (!b.IsCollisionEnabled()) continue;
 
-				float pushX = 0.0f, pushZ = 0.0f;
-				if (!ResolveXZ(a.BodySphere(), b.BodySphere(), pushX, pushZ)) continue;
+				// 大きいもの同士は 2 回処理されてしまうので、片側だけに絞る
+				if (!CollisionGrid::IsSmall(b.Radius()) && static_cast<int>(j) < li) continue;
 
-				const float total = a.PushWeight() + b.PushWeight();
-				if (total <= 0.0f) continue;
-
-				a.PushXZ(pushX * (b.PushWeight() / total), pushZ * (b.PushWeight() / total));
-				b.PushXZ(-pushX * (a.PushWeight() / total), -pushZ * (a.PushWeight() / total));
+				PushApart(a, b);
 			}
 		}
 	}

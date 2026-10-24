@@ -21,6 +21,7 @@ bool GltfRenderer::Init()
 	if (!CompileShaders()) return false;
 	if (!CreateRootSignature()) return false;
 	if (!CreateShadowRootSignature()) return false;
+	if (!CreateIdentityVisible()) return false;
 	if (!CreateGraphicsPipeline()) return false;
 
 	return true;
@@ -215,7 +216,7 @@ bool GltfRenderer::CreateShadowRootSignature()
 	// 影パスは深度しか書かない。
 	// ピクセルシェーダーが無いので、マテリアルもテクスチャもサンプラーも要らない。
 	// ディスクリプタテーブルが 1 つも無いため、ヒープの切り替えも不要になる。
-	D3D12_ROOT_PARAMETER rootParam[3] = {};
+	D3D12_ROOT_PARAMETER rootParam[5] = {};
 
 	// 0 番: シーン定数(b0)。lightCamera を読む
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -232,6 +233,18 @@ bool GltfRenderer::CreateShadowRootSignature()
 	rootParam[2].Descriptor.ShaderRegister = 3;
 	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
+	// 3 番: カスケードの番号(b1)
+	rootParam[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	rootParam[3].Constants.ShaderRegister = 1;
+	rootParam[3].Constants.RegisterSpace = 0;
+	rootParam[3].Constants.Num32BitValues = 1;
+	rootParam[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+	// 4 番: 可視リスト(t4)
+	rootParam[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+	rootParam[4].Descriptor.ShaderRegister = 4;
+	rootParam[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
 	D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 	// 頂点レイアウトは使う。それ以外のステージからのアクセスは明示的に拒否する
 	rootSignatureDesc.Flags =
@@ -241,7 +254,7 @@ bool GltfRenderer::CreateShadowRootSignature()
 		| D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS
 		| D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 	rootSignatureDesc.pParameters = rootParam;
-	rootSignatureDesc.NumParameters = 3;
+	rootSignatureDesc.NumParameters = 5;
 	rootSignatureDesc.pStaticSamplers = nullptr;
 	rootSignatureDesc.NumStaticSamplers = 0;
 
@@ -416,6 +429,47 @@ bool GltfRenderer::CreateGraphicsPipeline()
 	return true;
 }
 
+bool GltfRenderer::CreateIdentityVisible()
+{
+	D3D12_HEAP_PROPERTIES heapProp = {};
+
+	heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
+	heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+	D3D12_RESOURCE_DESC resDesc = {};
+
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resDesc.Width = sizeof(UINT);        // 1 要素だけ
+	resDesc.Height = 1;
+	resDesc.DepthOrArraySize = 1;
+	resDesc.MipLevels = 1;
+	resDesc.Format = DXGI_FORMAT_UNKNOWN;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+	auto result = _dx12.Device()->CreateCommittedResource(
+		&heapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&_identityVisible)
+	);
+	if (!CheckResult(result, "CreateCommittedResource _identityVisible")) return false;
+
+	UINT* mapped = nullptr;
+
+	result = _identityVisible->Map(0, nullptr, reinterpret_cast<void**>(&mapped));
+	if (!CheckResult(result, "_identityVisible->Map")) return false;
+
+	mapped[0] = 0;                       // 0 番のインスタンスを指す
+	_identityVisible->Unmap(0, nullptr); // 以後書き換えないので、マップしたままにしない
+
+	return true;
+}
+
 void GltfRenderer::BeforeDraw()
 {
 	auto cmdList = _dx12.CommandList();
@@ -434,5 +488,6 @@ void GltfRenderer::BeforeShadowDraw()
 	// 影パスは全アクターで PSO もルートシグネチャも同じなので、1 回だけ設定する
 	cmdList->SetGraphicsRootSignature(_shadowRootSignature.Get());
 	cmdList->SetPipelineState(_shadowPipelineState.Get());
+	cmdList->SetGraphicsRoot32BitConstant(3, _dx12.CurrentCascade(), 0);
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }

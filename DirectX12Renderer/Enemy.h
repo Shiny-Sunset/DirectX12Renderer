@@ -74,8 +74,11 @@ private:
 
     // -- 障害物の回避 --
     // 壁に押し付けられて動けないとき、一定時間だけ横へ逸れる
-    static constexpr float AvoidTime = 0.7f;        // 逸れる時間
-    static constexpr float StuckThreshold = 0.3f;   // 予定の何割しか進めなければ詰まりとみなす
+    static constexpr float AvoidTime = 0.7f;            // 逸れる時間
+    static constexpr float StuckCheckInterval = 0.25f;  // 詰まりを見る間隔
+    static constexpr float StuckThreshold = 0.3f;       // 予定の何割しか進めなければ詰まり
+
+    float _stuckTimer = 0.0f;   // 前回の判定からの経過時間
 
     // -- 定数：戦闘 --
     float AttackRange = GameConfig::Enemy::AttackRange;      // この距離で攻撃を始める

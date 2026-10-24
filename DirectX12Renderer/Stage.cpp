@@ -124,6 +124,7 @@ void Stage::DrawShadow()
 
     cmdList->SetGraphicsRootConstantBufferView(0, _dx12.SceneConstantBufferAddress());
     cmdList->SetGraphicsRootShaderResourceView(1, _instanceBuff->GetGPUVirtualAddress());
+    cmdList->SetGraphicsRoot32BitConstant(2, _dx12.CurrentCascade(), 0);
 
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     cmdList->IASetVertexBuffers(0, 1, &_vbView);
@@ -165,29 +166,29 @@ bool Stage::CreateVertexAndIndexBuffer()
 
     // -- 頂点バッファの作成 --
     // 頂点ヒープの設定
-    D3D12_HEAP_PROPERTIES heapprop = {};
+    D3D12_HEAP_PROPERTIES heapProp = {};
 
-    heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
-    heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
+    heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
     // リソースの設定
-    D3D12_RESOURCE_DESC resdesc = {};
+    D3D12_RESOURCE_DESC resDesc = {};
 
-    resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resdesc.Width = sizeof(vertices);	// 頂点情報が入るだけのサイズ
-    resdesc.Height = 1;
-    resdesc.DepthOrArraySize = 1;
-    resdesc.MipLevels = 1;
-    resdesc.Format = DXGI_FORMAT_UNKNOWN;
-    resdesc.SampleDesc.Count = 1;
-    resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resDesc.Width = sizeof(vertices);	// 頂点情報が入るだけのサイズ
+    resDesc.Height = 1;
+    resDesc.DepthOrArraySize = 1;
+    resDesc.MipLevels = 1;
+    resDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resDesc.SampleDesc.Count = 1;
+    resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+    resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     auto result = device->CreateCommittedResource(
-        &heapprop,
+        &heapProp,
         D3D12_HEAP_FLAG_NONE,
-        &resdesc,
+        &resDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&_vertBuff)
@@ -210,10 +211,10 @@ bool Stage::CreateVertexAndIndexBuffer()
 
 
     // インデックスバッファの作成
-    resdesc.Width = sizeof(indices);
+    resDesc.Width = sizeof(indices);
 
     result = device->CreateCommittedResource(
-        &heapprop, D3D12_HEAP_FLAG_NONE, &resdesc,
+        &heapProp, D3D12_HEAP_FLAG_NONE, &resDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
         IID_PPV_ARGS(&_idxBuff));
     if (!CheckResult(result, "CreateCommittedResource _idxBuff")) return false;
@@ -351,7 +352,7 @@ bool Stage::CreateRootSignature()
 bool Stage::CreateShadowRootSignature()
 {
     // 影パスは深度しか書かない。
-    D3D12_ROOT_PARAMETER rootParam[2] = {};
+    D3D12_ROOT_PARAMETER rootParam[3] = {};
 
     // 0 番: シーン定数(b0)。lightCamera を読む
     rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -363,6 +364,12 @@ bool Stage::CreateShadowRootSignature()
     rootParam[1].Descriptor.ShaderRegister = 1;
     rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
+    rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    rootParam[2].Constants.ShaderRegister = 1;     // b1
+    rootParam[2].Constants.RegisterSpace = 0;
+    rootParam[2].Constants.Num32BitValues = 1;
+    rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
     D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
     rootSignatureDesc.Flags =
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
@@ -371,7 +378,7 @@ bool Stage::CreateShadowRootSignature()
         | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS
         | D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
     rootSignatureDesc.pParameters = rootParam;
-    rootSignatureDesc.NumParameters = 2;
+    rootSignatureDesc.NumParameters = 3;
     rootSignatureDesc.pStaticSamplers = nullptr;
     rootSignatureDesc.NumStaticSamplers = 0;
 
@@ -481,7 +488,7 @@ bool Stage::CreatePipelineState()
     gpipeline.NumRenderTargets = 0;
     gpipeline.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;   // 0 本なので UNKNOWN に戻す
     gpipeline.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-    gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+    gpipeline.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 
     result = _dx12.Device()->CreateGraphicsPipelineState(
         &gpipeline, IID_PPV_ARGS(&_shadowPipelineState));

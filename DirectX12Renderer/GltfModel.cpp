@@ -69,14 +69,14 @@ bool GltfModel::LoadGltfFile(
 {
 	cgltf_options options = {};
 	cgltf_data* data = nullptr;
-	// ① JSON チャンクをパース
+	// JSON チャンクをパース
 	cgltf_result res = cgltf_parse_file(&options, modelPath.c_str(), &data);
 	if (res != cgltf_result_success) {
 		std::cout << "Failed cgltf_parse_file" << std::endl;
 		return false;
 	}
 
-	// ② BIN チャンクを buffers[].data に載せる
+	// BIN チャンクを buffers[].data に載せる
 	//    これを忘れるとアクセサ読み出しが全部失敗する
 	res = cgltf_load_buffers(&options, data, modelPath.c_str());
 	if (res != cgltf_result_success) {
@@ -459,29 +459,29 @@ bool GltfModel::CreateVertexAndIndexBuffer(
 
 	// -- 頂点バッファの作成 --
 	// 頂点ヒープの設定
-	D3D12_HEAP_PROPERTIES heapprop = {};
+	D3D12_HEAP_PROPERTIES heapProp = {};
 
-	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
-	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
+	heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// リソースの設定
-	D3D12_RESOURCE_DESC resdesc = {};
+	D3D12_RESOURCE_DESC resDesc = {};
 
-	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resdesc.Width = vertices.size() * sizeof(Vertex);	// 頂点情報が入るだけのサイズ
-	resdesc.Height = 1;
-	resdesc.DepthOrArraySize = 1;
-	resdesc.MipLevels = 1;
-	resdesc.Format = DXGI_FORMAT_UNKNOWN;
-	resdesc.SampleDesc.Count = 1;
-	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resDesc.Width = vertices.size() * sizeof(Vertex);	// 頂点情報が入るだけのサイズ
+	resDesc.Height = 1;
+	resDesc.DepthOrArraySize = 1;
+	resDesc.MipLevels = 1;
+	resDesc.Format = DXGI_FORMAT_UNKNOWN;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	auto result = device->CreateCommittedResource(
-		&heapprop,
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&resdesc,
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_vertBuff)
@@ -490,12 +490,12 @@ bool GltfModel::CreateVertexAndIndexBuffer(
 
 	// インデックスバッファの作成
 	// 設定は、バッファのサイズ以外、頂点バッファの設定を使いまわす
-	resdesc.Width = indices.size() * sizeof(indices[0]);
+	resDesc.Width = indices.size() * sizeof(indices[0]);
 
 	result = device->CreateCommittedResource(
-		&heapprop,
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&resdesc,
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_idxBuff)
@@ -540,30 +540,30 @@ bool GltfModel::CreateMaterialBuffer()
 	_materialBuffSize = AlignmentedSize(sizeof(MaterialForHlsl), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
 	// ヒープの設定
-	D3D12_HEAP_PROPERTIES materialHeapProp = {};
+	D3D12_HEAP_PROPERTIES materialheapProp = {};
 
-	materialHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
-	materialHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	materialHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	materialheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
+	materialheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	materialheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// リソースの設定
-	D3D12_RESOURCE_DESC materialResDesc = {};
+	D3D12_RESOURCE_DESC materialresDesc = {};
 
-	materialResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	materialResDesc.Width = _materialBuffSize * _materials.size();
-	materialResDesc.Height = 1;                          // 必ず 1
-	materialResDesc.DepthOrArraySize = 1;                // 必ず 1
-	materialResDesc.MipLevels = 1;                       // 必ず 1
-	materialResDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
-	materialResDesc.SampleDesc.Count = 1;                // 必ず 1
-	materialResDesc.SampleDesc.Quality = 0;              // 必ず 0
-	materialResDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
-	materialResDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
+	materialresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	materialresDesc.Width = _materialBuffSize * _materials.size();
+	materialresDesc.Height = 1;                          // 必ず 1
+	materialresDesc.DepthOrArraySize = 1;                // 必ず 1
+	materialresDesc.MipLevels = 1;                       // 必ず 1
+	materialresDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
+	materialresDesc.SampleDesc.Count = 1;                // 必ず 1
+	materialresDesc.SampleDesc.Quality = 0;              // 必ず 0
+	materialresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
+	materialresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
 
 	auto result = device->CreateCommittedResource(
-		&materialHeapProp,
+		&materialheapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&materialResDesc,
+		&materialresDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_materialBuff)

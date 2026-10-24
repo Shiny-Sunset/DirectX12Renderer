@@ -91,6 +91,13 @@ private:
         DirectX::XMMATRIX bones[GltfModel::MaxBoneCount];
     };
 
+    // SampleAnimation がフレームをまたいで持つ状態
+    struct SampleCache
+    {
+        int animIndex = -1;           // out にバインドポーズを書いたときのアニメ番号
+        std::vector<size_t> cursor;   // チャンネルごとの、前回見つけたキーの位置
+    };
+
     // -- 初期化のサブルーチン --
     bool CreateTransformBuffer();          // ワールド行列とボーン行列の定数バッファ(b1)
 
@@ -102,7 +109,7 @@ private:
     // @param animIndex アニメーション番号
     // @param timeSec 再生位置（秒）
     // @param out 書き出し先（バインドポーズで初期化してから上書きする）
-    void SampleAnimation(int animIndex, float timeSec, std::vector<GltfModel::Node>& out) const;
+    void SampleAnimation(int animIndex, float timeSec, std::vector<GltfModel::Node>& out, SampleCache& cache) const;
 
     // 2 つのポーズを混ぜる
     // @param weight 0 で a、1 で b
@@ -127,6 +134,9 @@ private:
     std::vector<GltfModel::Node> _animNodes;    // 最終的なポーズ
     std::vector<GltfModel::Node> _blendNodes;   // 移行元のポーズ（作業用）
     std::vector<DirectX::XMMATRIX> _boneMatrices;
+    std::vector<DirectX::XMMATRIX> _globals;
+    mutable SampleCache _animCache;    // _animNodes 用
+    mutable SampleCache _blendCache;   // _blendNodes 用
 
     // -- アニメーションの再生状態 --
     int _currentAnimation = -1;   // 再生中のアニメーション(-1 = 停止)

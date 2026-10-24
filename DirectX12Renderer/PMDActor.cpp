@@ -255,29 +255,29 @@ bool PMDActor::CreateVertexAndIndexBuffer(
 
 	// -- 頂点バッファの作成 --
 	// 頂点ヒープの設定
-	D3D12_HEAP_PROPERTIES heapprop = {};
+	D3D12_HEAP_PROPERTIES heapProp = {};
 
-	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
-	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
+	heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// リソースの設定
-	D3D12_RESOURCE_DESC resdesc = {};
+	D3D12_RESOURCE_DESC resDesc = {};
 
-	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resdesc.Width = vertices.size();	// 頂点情報が入るだけのサイズ
-	resdesc.Height = 1;
-	resdesc.DepthOrArraySize = 1;
-	resdesc.MipLevels = 1;
-	resdesc.Format = DXGI_FORMAT_UNKNOWN;
-	resdesc.SampleDesc.Count = 1;
-	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resDesc.Width = vertices.size();	// 頂点情報が入るだけのサイズ
+	resDesc.Height = 1;
+	resDesc.DepthOrArraySize = 1;
+	resDesc.MipLevels = 1;
+	resDesc.Format = DXGI_FORMAT_UNKNOWN;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	auto result = device->CreateCommittedResource(
-		&heapprop,
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&resdesc,
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_vertBuff)
@@ -286,12 +286,12 @@ bool PMDActor::CreateVertexAndIndexBuffer(
 
 	// インデックスバッファの作成
 	// 設定は、バッファのサイズ以外、頂点バッファの設定を使いまわす
-	resdesc.Width = indices.size() * sizeof(indices[0]);
+	resDesc.Width = indices.size() * sizeof(indices[0]);
 
 	result = device->CreateCommittedResource(
-		&heapprop,
+		&heapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&resdesc,
+		&resDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_idxBuff)
@@ -354,30 +354,30 @@ bool PMDActor::CreateMaterialBuffer(const std::vector<PMDMaterial>& pmdMaterials
 	_materialBuffSize = AlignmentedSize(sizeof(MaterialForHlsl), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
 	// ヒープの設定
-	D3D12_HEAP_PROPERTIES materialHeapProp = {};
+	D3D12_HEAP_PROPERTIES materialheapProp = {};
 
-	materialHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
-	materialHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	materialHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	materialheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;	// CPUからアクセス可能(マップ可能)
+	materialheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	materialheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// リソースの設定
-	D3D12_RESOURCE_DESC materialResDesc = {};
+	D3D12_RESOURCE_DESC materialresDesc = {};
 
-	materialResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	materialResDesc.Width = _materialBuffSize * _materials.size();
-	materialResDesc.Height = 1;                          // 必ず 1
-	materialResDesc.DepthOrArraySize = 1;                // 必ず 1
-	materialResDesc.MipLevels = 1;                       // 必ず 1
-	materialResDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
-	materialResDesc.SampleDesc.Count = 1;                // 必ず 1
-	materialResDesc.SampleDesc.Quality = 0;              // 必ず 0
-	materialResDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
-	materialResDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
+	materialresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	materialresDesc.Width = _materialBuffSize * _materials.size();
+	materialresDesc.Height = 1;                          // 必ず 1
+	materialresDesc.DepthOrArraySize = 1;                // 必ず 1
+	materialresDesc.MipLevels = 1;                       // 必ず 1
+	materialresDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
+	materialresDesc.SampleDesc.Count = 1;                // 必ず 1
+	materialresDesc.SampleDesc.Quality = 0;              // 必ず 0
+	materialresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
+	materialresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
 
 	auto result = device->CreateCommittedResource(
-		&materialHeapProp,
+		&materialheapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&materialResDesc,
+		&materialresDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_materialBuff)
@@ -403,33 +403,33 @@ bool PMDActor::CreateMaterialBuffer(const std::vector<PMDMaterial>& pmdMaterials
 bool PMDActor::CreateTransformBuffer()
 {
 	// ヒープの設定
-	D3D12_HEAP_PROPERTIES transformHeapProp = {};
+	D3D12_HEAP_PROPERTIES transformheapProp = {};
 
-	transformHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;        // CPUからアクセス可能(マップ可能)
-	transformHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	transformHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	transformheapProp.Type = D3D12_HEAP_TYPE_UPLOAD;        // CPUからアクセス可能(マップ可能)
+	transformheapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	transformheapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 
 	// リソースの設定
-	D3D12_RESOURCE_DESC transformResDesc = {};
+	D3D12_RESOURCE_DESC transformresDesc = {};
 
-	transformResDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	transformResDesc.Width = AlignmentedSize(
+	transformresDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	transformresDesc.Width = AlignmentedSize(
 		sizeof(TransformBufferData),
 		D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT
 		);
-	transformResDesc.Height = 1;                          // 必ず 1
-	transformResDesc.DepthOrArraySize = 1;                // 必ず 1
-	transformResDesc.MipLevels = 1;                       // 必ず 1
-	transformResDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
-	transformResDesc.SampleDesc.Count = 1;                // 必ず 1
-	transformResDesc.SampleDesc.Quality = 0;              // 必ず 0
-	transformResDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
-	transformResDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
+	transformresDesc.Height = 1;                          // 必ず 1
+	transformresDesc.DepthOrArraySize = 1;                // 必ず 1
+	transformresDesc.MipLevels = 1;                       // 必ず 1
+	transformresDesc.Format = DXGI_FORMAT_UNKNOWN;        // 必ず UNKNOWN
+	transformresDesc.SampleDesc.Count = 1;                // 必ず 1
+	transformresDesc.SampleDesc.Quality = 0;              // 必ず 0
+	transformresDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;  // 必ず ROW_MAJOR
+	transformresDesc.Flags = D3D12_RESOURCE_FLAG_NONE;    // 用途次第
 
 	auto result = _dx12.Device()->CreateCommittedResource(
-		&transformHeapProp,
+		&transformheapProp,
 		D3D12_HEAP_FLAG_NONE,
-		&transformResDesc,
+		&transformresDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&_transformBuff)
