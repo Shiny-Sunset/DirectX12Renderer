@@ -57,7 +57,7 @@ bool Stage::CompileShaders()
         L"StageVertexShader.hlsl",	// シェーダー名
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "StageVS", "vs_5_0",	// 関数は GroundVS、対象シェーダーは vs_5_0
+        "StageVS", "vs_5_0",	// 関数は StageVS、対象シェーダーは vs_5_0
         ShaderCompileFlags,
         0,
         &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
@@ -71,7 +71,7 @@ bool Stage::CompileShaders()
         L"StagePixelShader.hlsl",	// シェーダー名
         nullptr,	// defineは無し
         D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "StagePS", "ps_5_0",	// 関数は GroundPS、対象シェーダーは ps_5_0
+        "StagePS", "ps_5_0",	// 関数は StagePS、対象シェーダーは ps_5_0
         ShaderCompileFlags,
         0,
         &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る

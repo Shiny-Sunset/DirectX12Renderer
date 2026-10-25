@@ -81,6 +81,9 @@
     <ClCompile Include="SpriteRenderer.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="GateEffect.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="FontAtlas.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -144,6 +147,9 @@
     <None Include="SpriteShaderHeader.hlsli" />
     <None Include="SpriteVertexShader.hlsl" />
     <None Include="SpritePixelShader.hlsl" />
+    <None Include="GateShaderHeader.hlsli" />
+    <None Include="GateVertexShader.hlsl" />
+    <None Include="GatePixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h">
@@ -210,6 +216,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="SpriteRenderer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="GateEffect.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="FontAtlas.h">

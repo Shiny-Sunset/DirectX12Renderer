@@ -159,6 +159,8 @@ public:
 	void SetVSyncEnabled(bool enabled) { _vsyncEnabled = enabled; }
 	bool IsVSyncEnabled() const { return _vsyncEnabled; }
 
+	void SetTime(float time);
+
 	// ------------------------------------------------------------
 	// 各種オブジェクトの取得
 	// ------------------------------------------------------------
@@ -193,7 +195,8 @@ private:
 		DirectX::XMFLOAT4 cascadeNormalOffset;
 		DirectX::XMFLOAT4 shadowCenter;
 		float lightRange;                // 光源カメラの深度範囲（far - near）
-		float _pad1[3];
+		float time;
+		float _pad1[2];
 	};
 
 	static_assert(sizeof(SceneMatrix) % 16 == 0, "HLSL の定数バッファは 16 バイト単位で詰まる");

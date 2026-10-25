@@ -20,6 +20,7 @@
 #include "Stage.h"
 #include "EnemyPool.h"
 #include "Spawner.h"
+#include "GateEffect.h"
 #include "Util.h"
 #include <tchar.h>
 #include <iostream>
@@ -238,6 +239,11 @@ bool Application::Init()
 	_spawners.emplace_back(DirectX::XMFLOAT3{ -D, 0.0f,  D });
 	_spawners.emplace_back(DirectX::XMFLOAT3{ D, 0.0f,  D });
 
+	std::vector<DirectX::XMFLOAT3> nests;
+	for (const auto& s : _spawners) nests.push_back(s.Position());
+	_gates = std::make_unique<GateEffect>(*_dx12);
+	if (!_gates->Init(nests)) return false;
+
 	DirectX::XMFLOAT3 eye(0.0f, 1.0f, -2.0f);	// 視点
 	DirectX::XMFLOAT3 target(0.0f, 0.9f, 0.0f);	// 注視点
 
@@ -337,6 +343,14 @@ void Application::Run()
 		}
 
 		// -- 更新処理 --
+
+		if (_gameState != GameState::Paused)
+		{
+			// 何時間も動かすと float の刻みが粗くなるので、1 時間で巻き戻す
+			_vfxTime = fmodf(_vfxTime + _timer.RawDeltaTime(), 3600.0f);
+		}
+		_dx12->SetTime(_vfxTime);
+
 		if (_gameState == GameState::Playing)
 		{
 			_survivedTime += dt;
@@ -466,6 +480,7 @@ void Application::Run()
 				actor->Draw();
 			}
 			_enemyPool->Draw();
+			_gates->Draw();
 			_dx12->EndOffscreenPass();
 
 

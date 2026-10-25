@@ -177,6 +177,7 @@
     <ClCompile Include="PMDRenderer.cpp" />
     <ClCompile Include="FontAtlas.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
+    <ClCompile Include="GateEffect.cpp" />
     <ClCompile Include="Stage.cpp" />
     <ClCompile Include="Util.cpp" />
   </ItemGroup>
@@ -240,6 +241,7 @@
     <ClInclude Include="PMDRenderer.h" />
     <ClInclude Include="FontAtlas.h" />
     <ClInclude Include="SpriteRenderer.h" />
+    <ClInclude Include="GateEffect.h" />
     <ClInclude Include="Stage.h" />
     <ClInclude Include="UIText.h" />
     <ClInclude Include="Util.h" />
@@ -298,6 +300,9 @@
     <None Include="SpriteShaderHeader.hlsli" />
     <None Include="SpriteVertexShader.hlsl" />
     <None Include="SpritePixelShader.hlsl" />
+    <None Include="GateShaderHeader.hlsli" />
+    <None Include="GateVertexShader.hlsl" />
+    <None Include="GatePixelShader.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

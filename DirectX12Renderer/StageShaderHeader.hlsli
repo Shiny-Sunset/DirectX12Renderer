@@ -11,7 +11,8 @@ cbuffer SceneBuffer : register(b0)
     float4 cascadeNormalOffset; // x, y, z = 押し出し量（m）
     float4 shadowCenter;
     float lightRange;
-    float3 _pad1;
+    float time;
+    float2 _pad1;
 };
 
 Texture2DArray<float> shadowMap : register(t0); // 深度なので 1 成分

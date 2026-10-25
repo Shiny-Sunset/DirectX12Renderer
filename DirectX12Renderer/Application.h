@@ -28,6 +28,7 @@ class DebugUI;
 class King;
 class EnemyPool;
 class Spawner;
+class GateEffect;
 
 // アプリケーション全体を受け持つシングルトンクラス
 // ウィンドウの生成、メッセージループ、各オブジェクトの所有を行う
@@ -134,6 +135,7 @@ private:
 	std::unique_ptr<Ground> _ground;
 	std::unique_ptr<Pera> _pera;
 	std::unique_ptr<Stage> _stage;
+	std::unique_ptr<GateEffect> _gates;
 
 	std::unique_ptr<GltfModel> _playerModel;
 	std::unique_ptr<GltfModel> _kingModel;
@@ -162,6 +164,7 @@ private:
 	GameTimer _timer;
 	Input _input;
 	Camera _camera;
+	float _vfxTime = 0.0f;
 
 	GameState _gameState = GameState::Title;
 	float _gameStateTime = 0.0f;

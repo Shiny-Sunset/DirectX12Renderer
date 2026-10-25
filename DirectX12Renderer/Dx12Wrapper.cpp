@@ -1208,3 +1208,9 @@ void Dx12Wrapper::ReadGpuTimer()
 	D3D12_RANGE noWrite{ 0, 0 };
 	_queryReadback->Unmap(0, &noWrite);
 }
+
+void Dx12Wrapper::SetTime(float time)
+{
+	auto* s = Scene();
+	s->time = time;
+}
