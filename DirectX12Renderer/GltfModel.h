@@ -16,7 +16,7 @@ struct GltfInstanceData
     UINT _pad[3];       // 16 バイト境界に揃える
 };
 
-// このクラスは glTF(右手系) のglTF(.glb) モデルのデータを左手系に変換して取り込む。
+// このクラスは glTF(右手系) のglTF(.glb) モデルのデータを左手系に変換して取り込む
 class GltfModel
 {
 public:
@@ -94,7 +94,7 @@ public:
     const D3D12_INDEX_BUFFER_VIEW& IndexBufferView() const { return _ibView; }
     const std::vector<Primitive>& Primitives() const { return _primitives; }
 
-    // 描画に使うディスクリプタヒープ。
+    // 描画に使うディスクリプタヒープ
     // b0/b1 をルート CBV にしたので中身はモデルにしか依存せず、
     // 同じモデルを使うアクターは全員これを共有できる
     ID3D12DescriptorHeap* DescriptorHeap() const { return _descHeap.Get(); }

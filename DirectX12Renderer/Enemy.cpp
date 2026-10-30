@@ -48,7 +48,7 @@ void Enemy::Update(float deltaTime, const GameConfig::Enemy::Target& target, con
     switch (_state)
     {
     case State::Idle:
-        // 湧いた直後の 1 フレームだけ通る状態。
+        // 湧いた直後の 1 フレームだけ通る状態
         // 防衛ゲームなので、検知範囲を待たずに最初から王へ向かわせる
         // (当初は dist < DetectRange で Chase へ移していた。DetectRange は現在未使用)
         _controller.SetMoveVelocity(0.0f, 0.0f);
@@ -56,7 +56,7 @@ void Enemy::Update(float deltaTime, const GameConfig::Enemy::Target& target, con
         break;
 
     case State::Chase:
-        // 見失って Idle へ戻る処理は入れていない（上記のとおり常に王を狙う）。
+        // 見失って Idle へ戻る処理は入れていない（上記のとおり常に王を狙う）
         // LoseRange はヘイトがプレイヤーへ向いているときの判定にだけ使っている
 
         // -- 距離に関係なく、常にプレイヤーの方を向く --

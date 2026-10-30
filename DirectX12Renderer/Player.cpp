@@ -152,11 +152,28 @@ void Player::UpdateMove(float deltaTime, const Input& input, float cameraYaw, bo
 	// -- 3. 移動 --
 	if (inputX == 0.0f && inputZ == 0.0f)
 	{
+		// 打ち消し合い（A+D や W+S の同時押し）は正しく 0 になる
+				// ハードウェア側も同じ式で畳んでから比べる
+		const int asyncX = ((GetAsyncKeyState('D') & 0x8000) ? 1 : 0)
+			- ((GetAsyncKeyState('A') & 0x8000) ? 1 : 0);
+		const int asyncZ = ((GetAsyncKeyState('W') & 0x8000) ? 1 : 0)
+			- ((GetAsyncKeyState('S') & 0x8000) ? 1 : 0);
+
+		if ((asyncX != 0 || asyncZ != 0) && input.IsWindowActive())
+		{
+			++_inputDropCount;
+			_lastDropWasUi = !inputEnabled;
+		}
+
+		_noInputTime += deltaTime;
 		_controller.SetMoveVelocity(0.0f, 0.0f);   // 速度を止めるのを忘れずに
-		if (onGround) _actor.PlayAnimation("Idle");
+		// 1 フレームだけ入力が落ちても Idle へ行かない
+		// 入力はフレーム単位で欠けることがあるので、しきい値は時間で持つ
+		if (onGround && _noInputTime >= IdleDelay) _actor.PlayAnimation("Idle");
 	}
 	else
 	{
+		_noInputTime = 0.0f;
 		// カメラの向きを基準に、ワールドでの進行方向を作る
 		const DirectX::XMFLOAT3 forward = { sinf(cameraYaw), 0.0f, cosf(cameraYaw) };
 		// cross(up, forward) の展開。up = (0,1,0) で forward.y = 0 なので、

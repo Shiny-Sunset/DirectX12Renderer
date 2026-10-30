@@ -56,6 +56,8 @@ public:
     float WalkSpeed() const { return _walkSpeed; }
     void SetRunSpeed(float s) { _runSpeed = s; }
     float RunSpeed() const { return _runSpeed; }
+    int  InputDropCount() const { return _inputDropCount; }
+    bool LastDropWasUi() const { return _lastDropWasUi; }
 
 private:
     // -- 内部処理 --
@@ -75,6 +77,7 @@ private:
     float HitEnd = GameConfig::Player::HitEnd;          // 攻撃判定が消える時刻
     float DamagedTime = GameConfig::Player::DamagedTime;      // のけぞっている時間
     float InvincibleTime = GameConfig::Player::InvincibleTime;   // 被弾後の無敵時間
+    static constexpr float IdleDelay = 0.08f;   // これだけ入力が無ければ Idle へ
 
     // -- 参照するもの（所有しない） --
     GltfActor& _actor;
@@ -86,8 +89,11 @@ private:
     int _hp = GameConfig::Player::MaxHP;
     float _invincibleTime = 0.0f;   // 残りの無敵時間
     unsigned int _attackId = 1;     // 攻撃を出すたびに増える
+    float _noInputTime = 0.0f;
 
     // -- 調整値 --
     float _walkSpeed = GameConfig::Player::WalkSpeed;   // m/秒
     float _runSpeed = GameConfig::Player::RunSpeed;
+    int  _inputDropCount = 0;      // 押しているのに 0 になった回数
+    bool _lastDropWasUi = false;   // そのとき UI に取られていたか
 };

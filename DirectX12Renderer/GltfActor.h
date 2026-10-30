@@ -12,7 +12,7 @@ class Dx12Wrapper;
 class GltfRenderer;
 
 // 画面に出るキャラクター 1 体分（見た目）を受け持つクラス
-// 頂点・テクスチャ・アニメーションのデータは GltfModel が持ち、複数のアクターで共有する。
+// 頂点・テクスチャ・アニメーションのデータは GltfModel が持ち、複数のアクターで共有する
 // このクラスは「その 1 体だけの情報」＝ 位置・向き・現在のポーズ・定数バッファを持つ
 class GltfActor
 {
@@ -23,7 +23,7 @@ public:
     GltfActor(const GltfActor&) = delete;
     GltfActor& operator=(const GltfActor&) = delete;
 
-    // @param ownBuffer 自分用のインスタンスバッファを持つか。
+    // @param ownBuffer 自分用のインスタンスバッファを持つか
     //                  false のアクターは、外（EnemyPool）がまとめて詰めて描く
     bool Init(bool ownBuffer = true);
 
@@ -51,6 +51,8 @@ public:
 
     // アニメーションを止めて、バインドポーズに戻す
     void StopAnimation();
+
+    const std::vector<GltfModel::Node>& Pose() const { return _blending ? _poseNodes : _animNodes; }
 
     const char* CurrentAnimationName() const
     {
@@ -133,15 +135,18 @@ private:
     // -- 現在のポーズ（このアクターだけのもの） --
     std::vector<GltfModel::Node> _animNodes;    // 最終的なポーズ
     std::vector<GltfModel::Node> _blendNodes;   // 移行元のポーズ（作業用）
+    std::vector<GltfModel::Node> _poseNodes;
     std::vector<DirectX::XMMATRIX> _boneMatrices;
     std::vector<DirectX::XMMATRIX> _globals;
     mutable SampleCache _animCache;    // _animNodes 用
     mutable SampleCache _blendCache;   // _blendNodes 用
+    bool _blending = false;
 
     // -- アニメーションの再生状態 --
     int _currentAnimation = -1;   // 再生中のアニメーション(-1 = 停止)
     float _animTime = 0.0f;
     bool _loop = true;
+    bool _prevLoop = true;
 
     // ブレンド（移行元として残っている、1 つ前のアニメーション）
     int _prevAnimation = -1;      // -1 ならブレンド中ではない

@@ -11,11 +11,11 @@
 namespace
 {
 	// -- 座標系の変換 --
-	// glTF は右手系(Y-up, -Z 前方)、このレンダラーは左手系。
-	// Z 鏡映 M = diag(1, 1, -1, 1) による共役変換 M * A * M で取り込む。
+	// glTF は右手系(Y-up, -Z 前方)、このレンダラーは左手系
+	// Z 鏡映 M = diag(1, 1, -1, 1) による共役変換 M * A * M で取り込む
 	//
-	// ★ glTF から座標・回転・行列を読むときは必ずこの関数を通すこと。
-	//    片方だけ変換すると、バインドポーズでは気づけずアニメーションで初めて破綻する。
+	// ★ glTF から座標・回転・行列を読むときは必ずこの関数を通すこと
+	//    片方だけ変換すると、バインドポーズでは気づけずアニメーションで初めて破綻する
 
 	// 位置・平行移動・法線・方向ベクトル
 	DirectX::XMFLOAT3 ToLH(const float v[3])
@@ -173,8 +173,8 @@ bool GltfModel::LoadGltfFile(
 			}
 
 			// インデックス
-			// 位置を Z 鏡映しているため面の裏表が反転する。
-			// 巻き順(2 番目と 3 番目)を入れ替えて、D3D の既定(時計回り = 表)に合わせる。
+			// 位置を Z 鏡映しているため面の裏表が反転する
+			// 巻き順(2 番目と 3 番目)を入れ替えて、D3D の既定(時計回り = 表)に合わせる
 			for (cgltf_size k = 0; k + 2 < prim.indices->count; k += 3)
 			{
 				indices.push_back(static_cast<uint16_t>(cgltf_accessor_read_index(prim.indices, k + 0)));
@@ -416,9 +416,9 @@ bool GltfModel::LoadAnimations(const cgltf_data* data)
 
 void GltfModel::BuildSmoothNormals(std::vector<Vertex>& vertices)
 {
-	// フラットシェーディングのモデルは、同じ座標に複数の法線が割り当てられている。
+	// フラットシェーディングのモデルは、同じ座標に複数の法線が割り当てられている
 	// そのまま押し出すと輪郭線のメッシュが継ぎ目で裂けるため、
-	// 位置ごとに法線を平均したものを別に持たせる。
+	// 位置ごとに法線を平均したものを別に持たせる
 	// (シェーディング用の normal は変更しないので、見た目のフラット感は保たれる)
 
 	using PosKey = std::tuple<float, float, float>;
@@ -521,7 +521,7 @@ bool GltfModel::CreateVertexAndIndexBuffer(
 	// 頂点バッファビューの作成
 	// バッファ全体を「何バイトごとの頂点の列」として解釈する
 	_vbView.BufferLocation = _vertBuff->GetGPUVirtualAddress();	// バッファの仮想アドレス
-	_vbView.SizeInBytes = vertices.size() * sizeof(Vertex);	// 全体のバイト数
+	_vbView.SizeInBytes = static_cast<UINT>(vertices.size() * sizeof(Vertex));	// 全体のバイト数
 	_vbView.StrideInBytes = sizeof(Vertex);	// 1頂点あたりのバイト数
 
 	// インデックスバッファビューの作成

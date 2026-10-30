@@ -53,6 +53,12 @@ namespace
 			PostQuitMessage(0);
 			return 0;
 		}
+
+		if (msg == WM_SIZE && wparam != SIZE_MINIMIZED)
+		{
+			Application::Instance().OnResize(LOWORD(lparam), HIWORD(lparam));
+			return 0;
+		}
 		return DefWindowProc(hwnd, msg, wparam, lparam);
 	}
 	constexpr float TurnSpeed = 12.0f;   // 向きを合わせる速さ
@@ -131,7 +137,91 @@ bool Application::CreateGameWindow()
 		return false;
 	}
 
+	_savedStyle = GetWindowLongPtr(_hwnd, GWL_STYLE);
+
+	SetClientSize(window_width, window_height);
+
 	return true;
+}
+
+void Application::ApplyDisplayMode(DisplayMode mode)
+{
+	const bool wasFullscreen = (_displayMode == DisplayMode::Fullscreen);
+
+	if (mode == DisplayMode::Fullscreen)
+	{
+		if (!wasFullscreen)
+		{
+			_savedStyle = GetWindowLongPtr(_hwnd, GWL_STYLE);
+			GetWindowRect(_hwnd, &_savedRect);
+		}
+
+		MONITORINFO mi = { sizeof(mi) };
+		GetMonitorInfo(MonitorFromWindow(_hwnd, MONITOR_DEFAULTTONEAREST), &mi);
+
+		// rcWork ではなく rcMonitor。rcWork はタスクバーを除いた範囲
+		SetWindowLongPtr(_hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+		SetWindowPos(_hwnd, HWND_TOP,
+			mi.rcMonitor.left, mi.rcMonitor.top,
+			mi.rcMonitor.right - mi.rcMonitor.left,
+			mi.rcMonitor.bottom - mi.rcMonitor.top,
+			SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+	}
+	else
+	{
+		const int w = (mode == DisplayMode::Windowed1080) ? 1920 : 1280;
+		const int h = (mode == DisplayMode::Windowed1080) ? 1080 : 720;
+
+		const LONG_PTR style = _savedStyle | WS_VISIBLE;
+		SetWindowLongPtr(_hwnd, GWL_STYLE, style);
+
+		RECT r = { 0, 0, w, h };
+		AdjustWindowRectExForDpi(&r, static_cast<DWORD>(_savedStyle), FALSE, 0,
+			GetDpiForWindow(_hwnd));
+
+		// フルスクリーンから戻るときだけ元の位置へ
+		// ウィンドウ同士の切り替えでは動かさない
+		const UINT flags = SWP_NOZORDER | SWP_FRAMECHANGED
+			| (wasFullscreen ? 0 : SWP_NOMOVE);
+		SetWindowPos(_hwnd, nullptr, _savedRect.left, _savedRect.top,
+			r.right - r.left, r.bottom - r.top, flags);
+	}
+	_displayMode = mode;
+}
+
+void Application::SetClientSize(int w, int h)
+{
+	const DWORD style = static_cast<DWORD>(GetWindowLongPtr(_hwnd, GWL_STYLE));
+	RECT r = { 0, 0, w, h };
+
+	// DPI 対応を入れたので AdjustWindowRect ではなく ForDpi
+	// 前者はシステム DPI 基準なので、拡大率の違うモニタで枠のぶんがずれる
+	AdjustWindowRectExForDpi(&r, style, FALSE, 0, GetDpiForWindow(_hwnd));
+
+	SetWindowPos(_hwnd, nullptr, 0, 0, r.right - r.left, r.bottom - r.top,
+		SWP_NOMOVE | SWP_NOZORDER);
+}
+
+void Application::OnResize(int w, int h)
+{
+	if (_dx12 == nullptr || _ui == nullptr || _debugUI == nullptr) return;
+	_dx12->Resize(w, h);
+
+	_uiScale = h / 1080.0f;
+	ImGui::GetStyle().FontScaleMain = 1.5f * _uiScale;
+
+	const int s = static_cast<int>(28 * _uiScale);
+	const int l = static_cast<int>(64 * _uiScale);
+	if (s != _fontSmallPx)      // 同じサイズなら焼き直さない
+	{
+		_fontSmallPx = s;
+		_fontLargePx = l;
+		if (_fontSmall->Build(L"Meiryo", s, BuildCharset())
+			&& _fontLarge->Build(L"Meiryo", l, BuildCharset(), 2048))
+		{
+			_ui->RefreshFontViews();   // 両方焼けてから SRV を作り直す
+		}
+	}
 }
 
 bool Application::Init()
@@ -299,7 +389,7 @@ void Application::Run()
 			break;
 		}
 
-		_input.Update();
+		_input.Update(_hwnd);
 		const float dt = _timer.Tick();
 		_gameStateTime += dt;
 
@@ -496,6 +586,12 @@ void Application::Run()
 			_dx12->EndDraw();
 			_dx12->Flip();
 		}
+
+		if (_pendingMode)
+		{
+			ApplyDisplayMode(*_pendingMode);
+			_pendingMode.reset();
+		}
 	}
 }
 
@@ -548,6 +644,13 @@ void Application::BuildDebugUI()
 	{
 		_timer.SetTimeScale(timeScale);
 	}
+
+	ImGui::Separator();
+
+	if (ImGui::Button("1920 x 1080")) RequestDisplayMode(DisplayMode::Windowed1080);
+	if (ImGui::Button("1280 x 720"))  RequestDisplayMode(DisplayMode::Windowed720);
+	if (ImGui::Button("Fullscreen"))  RequestDisplayMode(DisplayMode::Fullscreen);
+	ImGui::TextDisabled("If the monitor is 1080p, the window size won't fit within the 1920x1080 resolution.");
 
 	ImGui::Separator();
 
@@ -703,6 +806,9 @@ void Application::BuildDebugUI()
 		_playerController->SetRadius(radius);
 	}
 
+	ImGui::Text("Input drops: %d  (lastWasUI: %s)",
+		_playerLogic->InputDropCount(), _playerLogic->LastDropWasUi() ? "yes" : "no");
+
 	// プレイヤーと 2 体目の距離
 	if (_ownedControllers.size() > 1)
 	{
@@ -782,8 +888,8 @@ void Application::DrawHud()
 	const auto hpOn = SrgbColor(90, 220, 120);
 	const auto hpOff = SrgbColor(60, 60, 60, 0.6f);
 
-	constexpr float X = 40.0f, Y = 40.0f;
-	constexpr float BarW = 320.0f, BarH = 22.0f;
+	const float X = 40.0f * _uiScale, Y = 40.0f * _uiScale;
+	const float BarW = 320.0f * _uiScale, BarH = 22.0f * _uiScale;
 
 	// 四角をまとめて積む（バッチを 2 つで済ませるため、文字より先に）
 	_ui->FillRect(X, Y, BarW, BarH, back);
@@ -791,7 +897,7 @@ void Application::DrawHud()
 
 	for (int i = 0; i < GameConfig::Player::MaxHP; ++i)
 	{
-		_ui->FillRect(X + i * 28.0f, Y + 32.0f, 22.0f, 22.0f,
+		_ui->FillRect(X + i * 28.0f * _uiScale, Y + 32.0f * _uiScale, 22.0f * _uiScale, 22.0f * _uiScale,
 			(i < _playerLogic->HP()) ? hpOn : hpOff);
 	}
 
@@ -800,13 +906,13 @@ void Application::DrawHud()
 	const float lh = static_cast<float>(_ui->LineHeight(FontSmall));
 
 	swprintf_s(buf, L"%s  %d / %d", UIText::HudKing, _king->HP(), _king->MaxHP());
-	_ui->DrawStringOutlined(FontSmall, X + BarW + 16.0f, Y, buf, white, black);
+	_ui->DrawStringOutlined(FontSmall, X + BarW + 16.0f * _uiScale, Y, buf, white, black);
 
 	swprintf_s(buf, L"%s  %.1f", UIText::HudTime, _survivedTime);
-	_ui->DrawStringOutlined(FontSmall, X, Y + 70.0f, buf, white, black);
+	_ui->DrawStringOutlined(FontSmall, X, Y + 70.0f * _uiScale, buf, white, black);
 
 	swprintf_s(buf, L"%s  %d", UIText::HudKill, _killCount);
-	_ui->DrawStringOutlined(FontSmall, X, Y + 70.0f + lh, buf, white, black);
+	_ui->DrawStringOutlined(FontSmall, X, Y + 70.0f * _uiScale + lh, buf, white, black);
 }
 
 void Application::DrawTitle()

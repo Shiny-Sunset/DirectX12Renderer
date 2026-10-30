@@ -137,7 +137,7 @@ void SpriteRenderer::DrawString(UINT fontId, float x, float y, const wchar_t* te
 void SpriteRenderer::DrawStringOutlined(UINT fontId, float x, float y, const wchar_t* text,
     const DirectX::XMFLOAT4& color, const DirectX::XMFLOAT4& outlineColor, float thickness)
 {
-    // 縁を 4 方向へずらして描いてから、本体を上に重ねる。
+    // 縁を 4 方向へずらして描いてから、本体を上に重ねる
     // 斜め 4 方向も足すと角が埋まるが、四角の数が倍になるのでここでは上下左右だけ
     static const float dx[] = { -1.0f, 1.0f,  0.0f, 0.0f };
     static const float dy[] = { 0.0f, 0.0f, -1.0f, 1.0f };

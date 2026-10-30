@@ -14,7 +14,7 @@ float4 GroundPS(GroundOutput input) : SV_TARGET
     float3 color = lerp(lineColor, baseColor, lineMask);
     
     
-    // 箱と同じ中心からの距離で選ぶ。
+    // 箱と同じ中心からの距離で選ぶ
     // 箱は光源方向に対して垂直な正方形なので、半径 area/2 の球は必ず中に収まる
     float d = length(input.worldPos - shadowCenter.xyz);
     uint c = 0;

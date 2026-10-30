@@ -1,5 +1,4 @@
 ﻿#include "PMDActor.h"
-
 #include "Dx12Wrapper.h"
 #include "Util.h"
 
@@ -7,6 +6,10 @@
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+
+// 書籍時代の PMD 読み込み。現在は使っていないため、
+// 安全版への置き換えは行わず警告だけ抑制する
+#pragma warning(disable : 4996)
 
 using Microsoft::WRL::ComPtr;
 

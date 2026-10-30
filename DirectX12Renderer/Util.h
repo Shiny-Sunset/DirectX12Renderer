@@ -8,8 +8,8 @@
 #include <chrono>
 
 // シェーダーをコンパイルするときのオプション
-// Debug ではシェーダーデバッガで追えるように最適化を切り、Release では最適化する。
-// Release でも最適化を切ったままにすると、ピクセルシェーダーの負荷がそのまま残る。
+// Debug ではシェーダーデバッガで追えるように最適化を切り、Release では最適化する
+// Release でも最適化を切ったままにすると、ピクセルシェーダーの負荷がそのまま残る
 #ifdef _DEBUG
 constexpr UINT ShaderCompileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else

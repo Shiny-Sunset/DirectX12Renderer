@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <memory>
 #include <vector>
+#include <optional>
 
 #include "GameTimer.h"
 #include "Input.h"
@@ -65,6 +66,10 @@ public:
 	// ウィンドウサイズを返す
 	SIZE GetWindowSize() const;
 
+	enum class DisplayMode { Windowed1080, Windowed720, Fullscreen };
+	void RequestDisplayMode(DisplayMode m) { _pendingMode = m; }
+	void OnResize(int w, int h);
+
 private:
 	Application() = default;
 	~Application() = default;
@@ -84,12 +89,16 @@ private:
 
 	// プレイヤーの攻撃が敵に当たっているかを調べる
 	void CheckAttackHits();
-
 	void CheckGameEnd();
-
 	void ChangeGameState(GameState next);
-
 	void RestartGame();
+
+	void ApplyDisplayMode(DisplayMode m);
+	DisplayMode _displayMode = DisplayMode::Windowed1080;
+	std::optional<DisplayMode> _pendingMode;
+	LONG_PTR _savedStyle = 0;
+	RECT _savedRect = {};
+	void SetClientSize(int w, int h);
 
 	int AliveEnemyCount();
 
@@ -146,7 +155,7 @@ private:
 	std::unique_ptr<PMDActor> _pmdActor;
 
 	// -- キャラクター --
-	// 見た目(GltfActor) と 体(CharacterController) は、プレイヤーも敵も同じ配列で扱う。
+	// 見た目(GltfActor) と 体(CharacterController) は、プレイヤーも敵も同じ配列で扱う
 	// 描画・物理・当たり判定を、区別せずまとめてループで回せるようにするため
 	std::vector<std::unique_ptr<GltfActor>> _gltfActors;
 	std::vector<std::unique_ptr<CharacterController>> _ownedControllers;   // プレイヤーと王
@@ -174,6 +183,9 @@ private:
 	float _survivedTime = 0.0f;   // 生存時間（スコア）
 	int _killCount = 0;           // 討伐数（スコア）
 	int _highScore = 0;
+	float _uiScale = 1.0f;
+	int _fontSmallPx = 28;
+	int _fontLargePx = 64;
 
 	CollisionGrid _collisionGrid;
 	std::vector<int> _candidates;

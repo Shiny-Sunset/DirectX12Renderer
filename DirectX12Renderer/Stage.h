@@ -28,7 +28,7 @@ public:
     // 指定した位置の真下にある足場の高さを返す
     // @param x, z 調べる水平位置（キャラクターの足元）
     // @param maxY この高さ以下の足場だけを対象にする（頭上の足場を拾わないため）
-    // @return 一番高い足場の上面。何も無ければ 0（地面）
+    // @return 一番高い足場の上面何も無ければ 0（地面）
     float GroundHeightAt(float x, float z, float maxY) const;
 
 private:
@@ -57,7 +57,7 @@ private:
     Dx12Wrapper& _dx12;
     GltfRenderer& _renderer;
 
-    std::vector<Box> _boxes;   // 足場。描画にも当たり判定にもこの 1 つを使う
+    std::vector<Box> _boxes;   // 足場描画にも当たり判定にもこの 1 つを使う
 
     ComPtr<ID3DBlob> _vsBlob;
     ComPtr<ID3DBlob> _psBlob;

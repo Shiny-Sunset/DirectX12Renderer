@@ -8,12 +8,13 @@ class Input
 {
 public:
     // 毎フレーム、メッセージ処理の後に 1 回だけ呼ぶ
-    void Update();
+    void Update(HWND hwnd);
 
     // @param key 仮想キーコード（'W' や VK_SPACE など）
     bool IsPressed(int key) const;     // 押している間ずっと true
     bool IsTriggered(int key) const;   // 押した瞬間のフレームだけ true
     bool IsReleased(int key) const;    // 離した瞬間のフレームだけ true
+    bool IsWindowActive() const { return _active; }
 
     // マウスの移動量（前フレームからの差。カメラの回転に使う）
     float MouseDeltaX() const { return _mouseDeltaX; }
@@ -29,4 +30,5 @@ private:
     float _mouseDeltaX = 0.0f;
     float _mouseDeltaY = 0.0f;
     bool _hasPrevMouse = false;
+    bool _active = false;
 };

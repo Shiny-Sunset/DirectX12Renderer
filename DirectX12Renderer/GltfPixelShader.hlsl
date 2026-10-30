@@ -15,8 +15,8 @@ float4 GltfPS(Output input) : SV_TARGET
     float alpha = texColor.a * baseColorFactor.a;
     
     // ハーフランバート
-    // 生の dot は -1〜1 なので、裏側がすべて 0 に潰れて階調が作れない。
-    // 0〜1 に写し直してから量子化する。
+    // 生の dot は -1〜1 なので、裏側がすべて 0 に潰れて階調が作れない
+    // 0〜1 に写し直してから量子化する
     float ndotl = dot(-light, normal);
     float halfLambert = ndotl * 0.5 + 0.5;
     
@@ -25,7 +25,7 @@ float4 GltfPS(Output input) : SV_TARGET
     float f = halfLambert * steps;
     float toon = saturate((floor(f) + smoothstep(0.0, 0.08, frac(f))) / (steps - 1.0));
     
-    // 箱と同じ中心からの距離で選ぶ。
+    // 箱と同じ中心からの距離で選ぶ
     // 箱は光源方向に対して垂直な正方形なので、半径 area/2 の球は必ず中に収まる
     float d = length(input.worldPos - shadowCenter.xyz);
     uint c = 0;

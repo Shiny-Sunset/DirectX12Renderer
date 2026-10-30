@@ -64,24 +64,27 @@ size_t AlignmentedSize(size_t size, size_t alignment)
 
 std::string GetExtension(const std::string& path)
 {
-	int idx = path.rfind('.');
-	return path.substr(idx + 1, path.length() - idx - 1);
+	const size_t idx = path.rfind('.');
+	if (idx == std::string::npos) return {};
+	return path.substr(idx + 1);
 }
 
 std::pair<std::string, std::string> SplitFileName(const std::string& path, const char splitter)
 {
-	int idx = path.find(splitter);
+	const size_t idx = path.find(splitter);
+	if (idx == std::string::npos) return {};
 	std::pair<std::string, std::string> ret;
 	ret.first = path.substr(0, idx);
-	ret.second = path.substr(idx + 1, path.length() - idx - 1);
+	ret.second = path.substr(idx + 1);
 	return ret;
 }
 
 std::string GetTexturePathFromModelAndTexPath(const std::string& modelPath, const char* texPath)
 {
-	int pathIndex1 = modelPath.rfind('/');
-	int pathIndex2 = modelPath.rfind('\\');
+	const size_t pathIndex1 = modelPath.rfind('/');
+	const size_t pathIndex2 = modelPath.rfind('\\');
 	auto pathIndex = std::max(pathIndex1, pathIndex2);
+	if (pathIndex == std::string::npos) return {};
 	auto folderPath = modelPath.substr(0, pathIndex + 1);
 	return folderPath + texPath;
 }

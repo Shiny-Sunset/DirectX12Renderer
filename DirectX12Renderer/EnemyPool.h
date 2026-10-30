@@ -47,7 +47,7 @@ public:
 
     int AliveCount() const;
 
-    // 同時に使ってよい数の上限を変える。
+    // 同時に使ってよい数の上限を変える
     // 下げたときは、はみ出した分をその場で片付ける
     void SetActiveLimit(size_t n);
     size_t ActiveLimit() const { return _activeLimit; }

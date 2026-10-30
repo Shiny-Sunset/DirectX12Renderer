@@ -152,7 +152,7 @@ bool EnemyPool::BuildInstanceData()
     _drawCount = 0;
     for (size_t i = 0; i < _actors.size(); ++i)
     {
-        // 描画側と同じ条件で選ぶこと（食い違うと段階 3 で行列がずれる）
+        // 描画側と同じ条件で選ぶこと
         if (!_active[i] || !_actors[i]->IsVisible()) continue;
 
         const UINT slot = _drawCount++;
@@ -165,7 +165,7 @@ bool EnemyPool::BuildInstanceData()
         std::copy(bm.begin(), bm.end(), bones + slot * _jointCount);
     }
 
-    // カスケードごとに「どの体を描くか」の一覧を作る。
+    // カスケードごとに「どの体を描くか」の一覧を作る
     // 箱は同心なので、小さいカスケードに入る体は大きいほうにも必ず入る
     for (UINT c = 0; c < GameConfig::CascadeCount; ++c)
     {

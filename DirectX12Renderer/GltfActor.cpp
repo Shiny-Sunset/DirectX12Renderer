@@ -35,6 +35,7 @@ bool GltfActor::Init(bool ownBuffer)
 	_globals.resize(_model.Nodes().size());
 	if (!CreateTransformBuffer()) return false;
 	_animNodes = _model.Nodes();
+	_poseNodes = _model.Nodes();
 	_blendNodes = _model.Nodes();
 	UpdateBoneMatrices();
 
@@ -62,7 +63,11 @@ void GltfActor::Update(float deltaTime)
 		if (_prevAnimation >= 0)
 		{
 			// 移行元も止めずに進める（歩行サイクルが固まらないように）
-			_prevAnimTime = std::fmod(_prevAnimTime + deltaTime, _model.Animations()[_prevAnimation].duration);
+			const float prevDuration = _model.Animations()[_prevAnimation].duration;
+			_prevAnimTime += deltaTime;
+			_prevAnimTime = _prevLoop
+				? std::fmod(_prevAnimTime, prevDuration)
+				: std::min(_prevAnimTime, prevDuration);
 
 			_blendRemain -= deltaTime;
 			if (_blendRemain <= 0.0f)
@@ -75,6 +80,7 @@ void GltfActor::Update(float deltaTime)
 		if (_prevAnimation < 0)
 		{
 			SampleAnimation(_currentAnimation, _animTime, _animNodes, _animCache);
+			_blending = false;
 		}
 		else
 		{
@@ -83,7 +89,8 @@ void GltfActor::Update(float deltaTime)
 
 			// 残り時間が減るほど、移行先の比率が上がる
 			const float weight = 1.0f - (_blendRemain / _blendDuration);
-			BlendNodes(_blendNodes, _animNodes, weight, _animNodes);
+			BlendNodes(_blendNodes, _animNodes, weight, _poseNodes);
+			_blending = true;
 		}
 	}
 
@@ -251,10 +258,10 @@ void GltfActor::UpdateBoneMatrices()
 	auto& globals = _globals;
 	for (int i : _model.NodeOrder())
 	{
-		const GltfModel::Node& n = _animNodes[i];
+		const GltfModel::Node& n = Pose()[i];
 
 		// S * R * T は形が決まっている（S は対角、T は 4 行目だけ）ので、
-		// 回転行列の 0〜2 行目をスケール倍し、4 行目に平行移動を入れれば同じ結果になる。
+		// 回転行列の 0〜2 行目をスケール倍し、4 行目に平行移動を入れれば同じ結果になる
 	    // 行列積 2 回がベクトル乗算 3 回に減る
 		auto local = DirectX::XMMatrixRotationQuaternion(DirectX::XMLoadFloat4(&n.rotation));
 		local.r[0] = DirectX::XMVectorScale(local.r[0], n.scale.x);
@@ -270,6 +277,34 @@ void GltfActor::UpdateBoneMatrices()
 	{
 		_boneMatrices[j] = _model.InverseBindMatrices()[j] * globals[_model.JointNodes()[j]];
 	}
+
+#ifdef _DEBUG
+	// T ポーズ ＝ 全ボーンが単位行列出た瞬間の状態を 1 行だけ残す
+	bool allIdentity = true;
+	for (const auto& bm : _boneMatrices)
+	{
+		DirectX::XMFLOAT4X4 f;
+		DirectX::XMStoreFloat4x4(&f, bm);
+		for (int r = 0; r < 4 && allIdentity; ++r)
+			for (int c = 0; c < 4; ++c)
+				if (fabsf(f.m[r][c] - (r == c ? 1.0f : 0.0f)) > 1e-4f) { allIdentity = false; break; }
+		if (!allIdentity) break;
+	}
+
+	// 王はアニメを持たずバインドポーズのままなので、再生中のものだけ見る
+	if (allIdentity && _currentAnimation >= 0)
+	{
+		std::cout << "[T-pose] joints=" << _model.JointNodes().size()
+			<< " cur=" << _currentAnimation << "(" << CurrentAnimationName() << ")"
+			<< " t=" << _animTime
+			<< " prev=" << _prevAnimation
+			<< " pt=" << _prevAnimTime
+			<< " remain=" << _blendRemain << " / " << _blendDuration
+			<< " animCache=" << _animCache.animIndex
+			<< " blendCache=" << _blendCache.animIndex
+			<< std::endl;
+	}
+#endif
 
 	// 自分用のバッファを持たないアクターは、EnemyPool がまとめて詰める
 	if (_mappedTransform != nullptr)
@@ -312,7 +347,7 @@ void GltfActor::SampleAnimation(int animIndex, float timeSec,
 
 
 	// -- バインドポーズの復元は、アニメが切り替わったときだけ --
-		// 動かさないノードは誰も書き込まないので、1 度戻せば以後そのまま残る。
+		// 動かさないノードは誰も書き込まないので、1 度戻せば以後そのまま残る
 		// 動かすノードは毎フレーム上書きされるので、戻す必要がない
 	if (cache.animIndex != animIndex)
 	{
@@ -328,7 +363,7 @@ void GltfActor::SampleAnimation(int animIndex, float timeSec,
 		GltfModel::Node& node = out[ch.targetNode];
 
 		// -- 前回見つけた位置から探す --
-		// 再生位置はふつう前へ進むので、たいてい 0〜1 歩で見つかる。
+		// 再生位置はふつう前へ進むので、たいてい 0〜1 歩で見つかる
 		// ループで巻き戻ったときだけ先頭からやり直す（自己修復するので、
 		// ループの検出を別に持つ必要がない）
 		size_t& k1 = cache.cursor[c];
@@ -407,6 +442,7 @@ bool GltfActor::PlayAnimation(const std::string& name, float blendSeconds, bool 
 		{
 			_prevAnimation = _currentAnimation;
 			_prevAnimTime = _animTime;
+			_prevLoop = _loop;
 			_blendRemain = blendSeconds;
 			_blendDuration = blendSeconds;
 		}
@@ -435,6 +471,7 @@ void GltfActor::StopAnimation()
 
 	// バインドポーズへ戻す
 	_animNodes = _model.Nodes();
+	_blending = false;
 	UpdateBoneMatrices();
 }
 

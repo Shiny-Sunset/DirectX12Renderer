@@ -245,6 +245,39 @@ bool Dx12Wrapper::CreateSwapChain(HWND hwnd)
 	result = swapchain1.As(&_swapchain);
 	if (!CheckResult(result, "IDXGISwapChain4 QueryInterface")) return false;
 
+	_dxgiFactory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+
+	return true;
+}
+
+bool Dx12Wrapper::Resize(int width, int height)
+{
+	if (width <= 0 || height <= 0) return true;
+	if (width == _windowWidth && height == _windowHeight) return true;
+
+	WaitForGpuIdle();   // 使用中のリソースを壊さない
+
+	// ResizeBuffers は、バックバッファへの参照が 1 つでも残っていると失敗する
+	// ComPtr を空にして参照を手放してから呼ぶ
+	_backBuffers.clear();
+
+	_windowWidth = width;
+	_windowHeight = height;
+
+	DXGI_SWAP_CHAIN_DESC desc = {};
+	_swapchain->GetDesc(&desc);
+	auto result = _swapchain->ResizeBuffers(BufferCount, width, height, desc.BufferDesc.Format, desc.Flags);
+	if (!CheckResult(result, "ResizeBuffers")) return false;
+
+	if (!CreateFinalRenderTargets()) return false;   // RTV ヒープごと作り直す
+	if (!CreatePeraResources()) return false;        // オフスクリーンと RTV / SRV
+	if (!CreateDepthBuffer()) return false;          // 深度と DSV
+
+	_viewport.Width = static_cast<float>(width);
+	_viewport.Height = static_cast<float>(height);
+	_scissorrect.right = _scissorrect.left + width;
+	_scissorrect.bottom = _scissorrect.top + height;
+
 	return true;
 }
 
@@ -625,9 +658,9 @@ void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 		const float area = GameConfig::CascadeAreas[i] * _shadowAreaScale;
 
 		// -- 注視点をテクセル境界に合わせる --
-		// 光源カメラが中途半端な位置にあると、影の縁のドットが毎フレーム入れ替わってチラつく。
+		// 光源カメラが中途半端な位置にあると、影の縁のドットが毎フレーム入れ替わってチラつく
 		// 光源から見た座標系で丸めてから戻すことで、格子が常に同じ場所に来るようにする
-		// テクセルスナップは「そのカスケードの」テクセル幅で行う。
+		// テクセルスナップは「そのカスケードの」テクセル幅で行う
 		// 共通にすると、粗いカスケードの影が毎フレーム踊る
 		const float texelSize = area / static_cast<float>(GameConfig::ShadowMapSize);
 
@@ -654,7 +687,7 @@ void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 	s->lightVec = _lightVec;
 	s->shadowMapTexel = 1.0f / static_cast<float>(GameConfig::ShadowMapSize);
 	s->lightRange = LightFar - LightNear;
-	// 箱の中心と、カスケードを選ぶ基準を同じ点にする。
+	// 箱の中心と、カスケードを選ぶ基準を同じ点にする
 		// ここがずれると「カスケード 0 と判定されたのに箱の外」という場所ができる
 	s->shadowCenter = { center.x, center.y, center.z, 0.0f };
 
@@ -1149,7 +1182,7 @@ bool Dx12Wrapper::CreateGpuTimer()
 	rd.SampleDesc.Count = 1;
 	rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-	// READBACK ヒープのリソースは COPY_DEST 以外の初期状態を受け付けない。
+	// READBACK ヒープのリソースは COPY_DEST 以外の初期状態を受け付けない
 	// 以後この状態から動かさないので、バリアも不要
 	r = _dev->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
 		D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&_queryReadback));
@@ -1164,7 +1197,7 @@ bool Dx12Wrapper::CreateGpuTimer()
 
 void Dx12Wrapper::StampGpuTimer(UINT marker)
 {
-	// タイムスタンプは「区間」ではなく「点」なので、BeginQuery は使わない。
+	// タイムスタンプは「区間」ではなく「点」なので、BeginQuery は使わない
 	// EndQuery だけを呼ぶのが正しい（BeginQuery を呼ぶとデバッグレイヤーが警告を出す）
 	_cmdList->EndQuery(_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
 		_frameIndex * MarkerCount + marker);
@@ -1183,7 +1216,7 @@ void Dx12Wrapper::ReadGpuTimer()
 {
 	if (_timestampFreq == 0) return;
 
-	// 作ったばかりの READBACK バッファの中身は未定義。
+	// 作ったばかりの READBACK バッファの中身は未定義
 	// 引き算が巻き戻って数百 ms になるので、一巡するまでは捨てる
 	if (_gpuTimerWarmup < FrameCount + 1) { ++_gpuTimerWarmup; return; }
 

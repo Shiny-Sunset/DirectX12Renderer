@@ -38,7 +38,7 @@ float ValueNoise(float2 p)
                 lerp(Hash(i + float2(0, 1)), Hash(i + float2(1, 1)), f.x), f.y);
 }
 
-// 周波数を倍・振幅を半分にしながら重ねる。
+// 周波数を倍・振幅を半分にしながら重ねる
 float Fbm(float2 p)
 {
     float v = 0.0;

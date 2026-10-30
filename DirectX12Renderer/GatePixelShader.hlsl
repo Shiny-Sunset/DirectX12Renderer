@@ -11,7 +11,7 @@ float4 GatePS(GateOutput input) : SV_TARGET
     // 渦。中心へ行くほど速く回す（(1 - r) の項）
     const float swirl = ang + time * 1.2 + (1.0 - r) * 3.0;
 
-    // 角度をそのままノイズに渡すと、0 と 2π の継ぎ目に切れ目が出る。
+    // 角度をそのままノイズに渡すと、0 と 2π の継ぎ目に切れ目が出る
     // sin/cos を通して「円周上で連続な 2 次元座標」にしてから渡す
     const float2 np = float2(cos(swirl), sin(swirl)) * (1.0 + r * 2.0);
     const float n = Fbm(np * 2.0 + time * 0.3);

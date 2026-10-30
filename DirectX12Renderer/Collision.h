@@ -42,7 +42,7 @@ bool ResolveSphereVsAABB(const Sphere& s, const AABB& b, DirectX::XMFLOAT3& outP
 class CollisionGrid
 {
 public:
-    // アリの直径 0.6m に合わせる。
+    // アリの直径 0.6m に合わせる
     // 「半径 × 2 ≦ CellSize」を満たすものだけマスに入れる約束なので、
     // 中心のマス 1 つに登録して 3×3 を見れば取りこぼしが無い
     static constexpr float CellSize = 1.0f;
@@ -59,6 +59,7 @@ public:
     void GatherCandidates(size_t i, const DirectX::XMFLOAT3& pos, std::vector<int>& out) const;
 
     // マスに入らなかった大きいもの（王など）。全員と総当たりする
+    // マスに入らなかった大きいもの（王など）全員と総当たりする
     const std::vector<int>& LargeIndices() const { return _large; }
 
 private:

@@ -36,6 +36,10 @@ public:
     float MeasureString(UINT fontId, const wchar_t* text) const;
     int   LineHeight(UINT fontId) const;
 
+    // フォントを焼き直したら呼ぶ。アトラスのリソースが別物になるので、
+    // SRV を作り直さないと解放済みのテクスチャを指したままになる
+    bool RefreshFontViews() { return CreateSrvHeap(); }
+
 private:
     template<class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -90,7 +94,7 @@ private:
     std::vector<Batch> _batches;
 };
 
-// UI の色はツールで見た値(sRGB)で書きたいので、リニアへ直してから渡す。
+// UI の色はツールで見た値(sRGB)で書きたいので、リニアへ直してから渡す
 // バックバッファが *_SRGB なので、そのまま渡すと明るく出る
 inline DirectX::XMFLOAT4 SrgbColor(int r, int g, int b, float a = 1.0f)
 {

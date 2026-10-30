@@ -46,6 +46,8 @@ public:
 	int WindowWidth() const { return _windowWidth; }
 	int WindowHeight() const { return _windowHeight; }
 
+	bool Resize(int width, int height);
+
 	// ------------------------------------------------------------
 	// 描画パスの制御
 	// ------------------------------------------------------------
@@ -93,7 +95,7 @@ public:
 	void SetLightVec(const DirectX::XMFLOAT3& v) { _lightVec = v; }
 	const DirectX::XMFLOAT3& LightVec() const { return _lightVec; }
 
-	// 影パスの絞り込みに使う。
+	// 影パスの絞り込みに使う
 	// UPLOAD ヒープは読み出しが極端に遅いので、CPU 側で使う分は控えを持つ
 	const DirectX::XMMATRIX& LightCamera(UINT cascade) const { return _lightCamera[cascade]; }
 

@@ -213,9 +213,9 @@ bool GltfRenderer::CreateRootSignature()
 
 bool GltfRenderer::CreateShadowRootSignature()
 {
-	// 影パスは深度しか書かない。
-	// ピクセルシェーダーが無いので、マテリアルもテクスチャもサンプラーも要らない。
-	// ディスクリプタテーブルが 1 つも無いため、ヒープの切り替えも不要になる。
+	// 影パスは深度しか書かない
+	// ピクセルシェーダーが無いので、マテリアルもテクスチャもサンプラーも要らない
+	// ディスクリプタテーブルが 1 つも無いため、ヒープの切り替えも不要になる
 	D3D12_ROOT_PARAMETER rootParam[5] = {};
 
 	// 0 番: シーン定数(b0)。lightCamera を読む

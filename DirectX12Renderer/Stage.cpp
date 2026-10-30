@@ -152,7 +152,7 @@ bool Stage::CreateVertexAndIndexBuffer()
         {{ h,-h,-h},{1,0,0}}, {{ h, h,-h},{1,0,0}}, {{ h, h, h},{1,0,0}}, {{ h,-h, h},{1,0,0}},
     };
 
-    // 各面を 2 枚の三角形に分ける。時計回りが表（D3D の既定）
+    // 各面を 2 枚の三角形に分ける時計回りが表（D3D の既定）
     uint16_t indices[36] = {};
     for (uint16_t f = 0; f < 6; ++f)
     {
@@ -237,7 +237,7 @@ bool Stage::CreateVertexAndIndexBuffer()
 
 bool Stage::CreateInstanceBuffer()
 {
-    // 箱ごとのワールド行列を 1 本のバッファに並べる。
+    // 箱ごとのワールド行列を 1 本のバッファに並べる
     D3D12_HEAP_PROPERTIES heapProp = {};
     heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;
     heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -287,7 +287,7 @@ bool Stage::CreateRootSignature()
     // ルートパラメーター(ディスクリプタテーブル)の作成
     D3D12_ROOT_PARAMETER rootParam[3] = {};
 
-    // 0 番: シーンの定数バッファ(b0)。view / proj / lightCamera
+    // 0 番: シーンの定数バッファ(b0)view / proj / lightCamera
     rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParam[0].Descriptor.ShaderRegister = 0;
     rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -351,15 +351,15 @@ bool Stage::CreateRootSignature()
 
 bool Stage::CreateShadowRootSignature()
 {
-    // 影パスは深度しか書かない。
+    // 影パスは深度しか書かない
     D3D12_ROOT_PARAMETER rootParam[3] = {};
 
-    // 0 番: シーン定数(b0)。lightCamera を読む
+    // 0 番: シーン定数(b0)lightCamera を読む
     rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rootParam[0].Descriptor.ShaderRegister = 0;
     rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
-    // 1 番: 箱ごとのワールド行列(b1)。通常描画と同じく 32bit 定数で渡す
+    // 1 番: 箱ごとのワールド行列(b1)通常描画と同じく 32bit 定数で渡す
     rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
     rootParam[1].Descriptor.ShaderRegister = 1;
     rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
@@ -415,7 +415,7 @@ bool Stage::CreatePipelineState()
             "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
         },
         {
-            // 法線（面の向き。陰影と、上面かどうかの判定に使う）
+            // 法線（面の向き陰影と、上面かどうかの判定に使う）
             "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
             D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
         },
@@ -558,7 +558,7 @@ void Stage::Unstuck(CharacterController& controller) const
         if (pos.y >= b.max.y) continue;              // 箱の上に立っている
         if (pos.y + height <= b.min.y) continue;     // 箱より下にいる
 
-        // -- めり込んでいる。一番近い面へ出す --
+        // -- めり込んでいる一番近い面へ出す --
         const float toTop = b.max.y - pos.y;                  // 上面へ
         const float toMinX = pos.x - b.min.x + controller.Radius();
         const float toMaxX = b.max.x - pos.x + controller.Radius();
