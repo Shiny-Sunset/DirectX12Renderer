@@ -35,67 +35,16 @@ void GltfRenderer::SetModelHeap(const GltfModel& model)
 
 bool GltfRenderer::CompileShaders()
 {
-	ComPtr<ID3DBlob> errorBlob;
-
-	// GltfVertexShader の設定
-	auto result = D3DCompileFromFile(
-		L"GltfVertexShader.hlsl",	// シェーダー名
-		nullptr,	// defineは無し
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-		"GltfVS", "vs_5_0",	// 関数は GltfVS、対象シェーダーは vs_5_0
-		ShaderCompileFlags,
-		0,
-		&_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "GltfVertexShader")) return false;
-
-	errorBlob.Reset();
-
-	// GltfPixelShaderの設定
-	result = D3DCompileFromFile(
-		L"GltfPixelShader.hlsl",	// シェーダー名
-		nullptr,	// defineは無し
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-		"GltfPS", "ps_5_0",	// 関数は GltfPS、対象シェーダーは ps_5_0
-		ShaderCompileFlags,
-		0,
-		&_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "GltfPixelShader")) return false;
-
-	errorBlob.Reset();
-
-	// GltfOutlineVertexShaderの設定
-	result = D3DCompileFromFile(
-		L"GltfOutlineVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-		"GltfOutlineVS", "vs_5_0",
-		ShaderCompileFlags, 0,
-		&_outlineVsBlob, &errorBlob
-	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "GltfOutlineVertexShader")) return false;
-
-	errorBlob.Reset();
-
-	// GltfOutlinePixelShaderの設定
-	result = D3DCompileFromFile(
-		L"GltfOutlinePixelShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-		"GltfOutlinePS", "ps_5_0",
-		ShaderCompileFlags, 0,
-		&_outlinePsBlob, &errorBlob
-	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "GltfOutlinePixelShader")) return false;
-
-	errorBlob.Reset();
-
-	// GltfShadowVertexShaderの設定
-	result = D3DCompileFromFile(
-		L"GltfShadowVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-		"ShadowVS", "vs_5_0",
-		ShaderCompileFlags, 0,
-		&_shadowVsBlob, &errorBlob
-	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "GltfShadowVertexShader")) return false;
-
+	if (!CompileShader(L"GltfVertexShader.hlsl", "GltfVS", "vs_5_0",
+		_vsBlob.ReleaseAndGetAddressOf())) return false;
+	if (!CompileShader(L"GltfPixelShader.hlsl", "GltfPS", "ps_5_0",
+		_psBlob.ReleaseAndGetAddressOf())) return false;
+	if (!CompileShader(L"GltfOutlineVertexShader.hlsl", "GltfOutlineVS", "vs_5_0",
+		_outlineVsBlob.ReleaseAndGetAddressOf())) return false;
+	if (!CompileShader(L"GltfOutlinePixelShader.hlsl", "GltfOutlinePS", "ps_5_0",
+		_outlinePsBlob.ReleaseAndGetAddressOf())) return false;
+	if (!CompileShader(L"GltfShadowVertexShader.hlsl", "ShadowVS", "vs_5_0",
+		_shadowVsBlob.ReleaseAndGetAddressOf())) return false;
 	return true;
 }
 

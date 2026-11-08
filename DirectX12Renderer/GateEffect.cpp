@@ -19,34 +19,10 @@ bool GateEffect::Init(const std::vector<DirectX::XMFLOAT3>& positions)
 
 bool GateEffect::CompileShaders()
 {
-    ComPtr<ID3DBlob> errorBlob;
-
-    // GateVertexShader の設定
-    auto result = D3DCompileFromFile(
-        L"GateVertexShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "GateVS", "vs_5_0",	// 関数は GateVS、対象シェーダーは vs_5_0
-        ShaderCompileFlags,
-        0,
-        &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "GateVertexShader")) return false;
-
-    errorBlob.Reset();
-
-    // GatePixelShaderの設定
-    result = D3DCompileFromFile(
-        L"GatePixelShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "GatePS", "ps_5_0",	// 関数は GatePS、対象シェーダーは ps_5_0
-        ShaderCompileFlags,
-        0,
-        &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "GatePixelShader")) return false;
-
+    if (!CompileShader(L"GateVertexShader.hlsl", "GateVS", "vs_5_0",
+        _vsBlob.ReleaseAndGetAddressOf())) return false;
+    if (!CompileShader(L"GatePixelShader.hlsl", "GatePS", "ps_5_0",
+        _psBlob.ReleaseAndGetAddressOf())) return false;
     return true;
 }
 

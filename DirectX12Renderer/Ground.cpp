@@ -20,34 +20,10 @@ bool Ground::Init()
 
 bool Ground::CompileShaders()
 {
-    ComPtr<ID3DBlob> errorBlob;
-
-    // GroundVertexShader の設定
-    auto result = D3DCompileFromFile(
-        L"GroundVertexShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "GroundVS", "vs_5_0",	// 関数は GroundVS、対象シェーダーは vs_5_0
-        ShaderCompileFlags,
-        0,
-        &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "GroundVertexShader")) return false;
-
-    errorBlob.Reset();
-
-    // GroundPixelShaderの設定
-    result = D3DCompileFromFile(
-        L"GroundPixelShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "GroundPS", "ps_5_0",	// 関数は GroundPS、対象シェーダーは ps_5_0
-        ShaderCompileFlags,
-        0,
-        &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "GroundPixelShader")) return false;
-
+    if (!CompileShader(L"GroundVertexShader.hlsl", "GroundVS", "vs_5_0",
+        _vsBlob.ReleaseAndGetAddressOf())) return false;
+    if (!CompileShader(L"GroundPixelShader.hlsl", "GroundPS", "ps_5_0",
+        _psBlob.ReleaseAndGetAddressOf())) return false;
     return true;
 }
 

@@ -50,43 +50,12 @@ bool Stage::Init()
 
 bool Stage::CompileShaders()
 {
-    ComPtr<ID3DBlob> errorBlob;
-
-    // StageVertexShader の設定
-    auto result = D3DCompileFromFile(
-        L"StageVertexShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "StageVS", "vs_5_0",	// 関数は StageVS、対象シェーダーは vs_5_0
-        ShaderCompileFlags,
-        0,
-        &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "StageVertexShader")) return false;
-
-    errorBlob.Reset();
-
-    // StagePixelShaderの設定
-    result = D3DCompileFromFile(
-        L"StagePixelShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "StagePS", "ps_5_0",	// 関数は StagePS、対象シェーダーは ps_5_0
-        ShaderCompileFlags,
-        0,
-        &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "StagePixelShader")) return false;
-
-    // StageShadowVertexShaderの設定
-    result = D3DCompileFromFile(
-        L"StageShadowVertexShader.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-        "StageShadowVS", "vs_5_0",
-        ShaderCompileFlags, 0,
-        &_shadowVsBlob, &errorBlob
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "StageShadowVertexShader")) return false;
-
+    if (!CompileShader(L"StageVertexShader.hlsl", "StageVS", "vs_5_0",
+        _vsBlob.ReleaseAndGetAddressOf())) return false;
+    if (!CompileShader(L"StagePixelShader.hlsl", "StagePS", "ps_5_0",
+        _psBlob.ReleaseAndGetAddressOf())) return false;
+    if (!CompileShader(L"StageShadowVertexShader.hlsl", "StageShadowVS", "vs_5_0",
+        _shadowVsBlob.ReleaseAndGetAddressOf())) return false;
     return true;
 }
 

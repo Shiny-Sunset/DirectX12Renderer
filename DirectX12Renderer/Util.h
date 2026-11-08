@@ -58,6 +58,19 @@ std::string GetTexturePathFromModelAndTexPath(const std::string& modelPath, cons
 // @return 変換されたワイド文字列
 std::wstring GetWideStringFromString(const std::string& str);
 
+// シェーダーを置いたフォルダ。末尾に区切りを付けて渡す（例: L"Shaders/"）
+// 起動時に 1 回だけ設定する
+void SetShaderDirectory(const std::wstring& dir);
+
+// シェーダーをファイルから読んでコンパイルする
+// フォルダは SetShaderDirectory で設定したものを前に付けるので、ファイル名だけ渡す
+// @param fileName  例: L"GltfVertexShader.hlsl"
+// @param entry     エントリポイント関数名
+// @param target    例: "vs_5_0"
+// @param blob      出力先
+// @return 成功したら true（失敗時はエラー内容を出力する）
+bool CompileShader(const wchar_t* fileName, const char* entry, const char* target, ID3DBlob** blob);
+
 // 生存期間を測って、渡された変数へ ms で書き出す
 // 使い方:  { ScopedTimer t(_msCollision);  ResolveCollisions(); }
 class ScopedTimer

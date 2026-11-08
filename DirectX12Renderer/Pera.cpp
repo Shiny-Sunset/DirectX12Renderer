@@ -20,34 +20,10 @@ bool Pera::Init()
 
 bool Pera::CompileShaders()
 {
-    ComPtr<ID3DBlob> errorBlob;
-
-    // PeraVertexShader の設定
-    auto result = D3DCompileFromFile(
-        L"PeraVertexShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "PeraVS", "vs_5_0",	// 関数は PeraVS、対象シェーダーは vs_5_0
-        ShaderCompileFlags,
-        0,
-        &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "PeraVertexShader")) return false;
-
-    errorBlob.Reset();
-
-    // PeraPixelShaderの設定
-    result = D3DCompileFromFile(
-        L"PeraPixelShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "PeraPS", "ps_5_0",	// 関数は PeraPS、対象シェーダーは ps_5_0
-        ShaderCompileFlags,
-        0,
-        &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "PeraPixelShader")) return false;
-
+    if (!CompileShader(L"PeraVertexShader.hlsl", "PeraVS", "vs_5_0",
+        _vsBlob.ReleaseAndGetAddressOf())) return false;
+    if (!CompileShader(L"PeraPixelShader.hlsl", "PeraPS", "ps_5_0",
+        _psBlob.ReleaseAndGetAddressOf())) return false;
     return true;
 }
 

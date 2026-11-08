@@ -22,6 +22,7 @@
 #include "Spawner.h"
 #include "GateEffect.h"
 #include "Util.h"
+#include "ShadowConfig.h"
 #include <tchar.h>
 #include <iostream>
 #include <algorithm>
@@ -226,6 +227,8 @@ void Application::OnResize(int w, int h)
 
 bool Application::Init()
 {
+	SetShaderDirectory(L"Shaders/");
+
 	auto result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 	if (FAILED(result))
 	{
@@ -547,7 +550,7 @@ void Application::Run()
 			ScopedTimer t(_msRecord);
 			// -- 0 パス目：影 --
 			_dx12->BeginShadowPass();
-			for (UINT c = 0; c < GameConfig::CascadeCount; ++c)
+			for (UINT c = 0; c < ShadowConfig::CascadeCount; ++c)
 			{
 				_dx12->BeginCascade(c);
 				_gltfRenderer->BeforeShadowDraw();
@@ -861,7 +864,7 @@ void Application::BuildProfileUI()
 		_msAnimAvg, _msSampleAvg, _msBoneAvg, _msInstanceAvg);
 	ImGui::Text("  Pairs %.3f (Build %.3f + Test %.3f)  Stage2 %.3f  Unstuck %.3f",
 		_msColPairsAvg, _msColBuildAvg, _msColTestAvg, _msColStage2Avg, _msColUnstuckAvg);
-	ImGui::Text("Frames in flight %u  ShadowMap %u  BufferCount %u", Dx12Wrapper::FrameCount, GameConfig::ShadowMapSize, Dx12Wrapper::BufferCount);
+	ImGui::Text("Frames in flight %u  ShadowMap %u  BufferCount %u", Dx12Wrapper::FrameCount, ShadowConfig::ShadowMapSize, Dx12Wrapper::BufferCount);
 	ImGui::Text("Anim %.3f  Rec %.3f", _msAnimAvg, _msRecordAvg);
 	ImGui::Text("Ants %d / %d", _enemyPool->AliveCount(), _tuning.enemyLimit);
 

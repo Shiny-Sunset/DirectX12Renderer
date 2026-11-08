@@ -3,6 +3,12 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <wrl.h>
+
+namespace
+{
+	std::wstring g_shaderDir;   // 既定は空。設定しなければ従来どおり作業ディレクトリ直下
+}
 
 bool CheckResult(HRESULT result, const char* what)
 {
@@ -116,4 +122,27 @@ std::wstring GetWideStringFromString(const std::string& str)
 
 	assert(num1 == num2);	// 一応チェック
 	return wstr;
+}
+
+void SetShaderDirectory(const std::wstring& dir)
+{
+	g_shaderDir = dir;
+}
+
+bool CompileShader(const wchar_t* fileName, const char* entry, const char* target, ID3DBlob** blob)
+{
+	const std::wstring path = g_shaderDir + fileName;
+
+	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+	auto result = D3DCompileFromFile(
+		path.c_str(),
+		nullptr,                              // define は無し
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,    // .hlsli は .hlsl からの相対で解決される
+		entry, target,
+		ShaderCompileFlags,
+		0,
+		blob, &errorBlob);
+
+	// エントリポイント名はシェーダーごとに一意なので、そのまま処理名に使える
+	return CheckShaderResult(result, errorBlob.Get(), entry);
 }

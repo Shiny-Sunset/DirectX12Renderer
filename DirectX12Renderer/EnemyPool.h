@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include "GameConfig.h"
+#include "ShadowConfig.h"
 
 class Dx12Wrapper;
 class GltfRenderer;
@@ -94,7 +95,7 @@ private:
     UINT _jointCount = 0;
     UINT _drawCount = 0;        // このフレームに詰めた数
     UINT _visibleStride = 0;               // 1 カスケード分のバイト数
-    UINT _visibleCount[GameConfig::CascadeCount] = {};
+    UINT _visibleCount[ShadowConfig::CascadeCount] = {};
     std::vector<GltfActor*> _slotActors;
     bool _outlineEnabled = true;
 };

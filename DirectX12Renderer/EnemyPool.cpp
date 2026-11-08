@@ -111,7 +111,7 @@ bool EnemyPool::CreateInstanceBuffers()
     result = _boneBuff->Map(0, nullptr, reinterpret_cast<void**>(&_mappedBone));
     if (!CheckResult(result, "_boneBuff->Map")) return false;
 
-    transformresDesc.Width = _visibleStride * GameConfig::CascadeCount * Dx12Wrapper::FrameCount;
+    transformresDesc.Width = _visibleStride * ShadowConfig::CascadeCount * Dx12Wrapper::FrameCount;
 
     result = _dx12.Device()->CreateCommittedResource(
         &transformheapProp,
@@ -167,10 +167,10 @@ bool EnemyPool::BuildInstanceData()
 
     // カスケードごとに「どの体を描くか」の一覧を作る
     // 箱は同心なので、小さいカスケードに入る体は大きいほうにも必ず入る
-    for (UINT c = 0; c < GameConfig::CascadeCount; ++c)
+    for (UINT c = 0; c < ShadowConfig::CascadeCount; ++c)
     {
         auto* list = reinterpret_cast<UINT*>(_mappedVisible
-            + (_dx12.FrameIndex() * GameConfig::CascadeCount + c) * _visibleStride);
+            + (_dx12.FrameIndex() * ShadowConfig::CascadeCount + c) * _visibleStride);
 
         UINT n = 0;
         for (UINT slot = 0; slot < _drawCount; ++slot)
@@ -353,7 +353,7 @@ void EnemyPool::SetActiveLimit(size_t n)
 D3D12_GPU_VIRTUAL_ADDRESS EnemyPool::VisibleAddress(UINT c) const
 {
     return _visibleBuff->GetGPUVirtualAddress()
-        + (_dx12.FrameIndex() * GameConfig::CascadeCount + c) * _visibleStride;
+        + (_dx12.FrameIndex() * ShadowConfig::CascadeCount + c) * _visibleStride;
 }
 
 bool EnemyPool::CastsShadowIn(const GltfActor& actor, UINT cascade) const
@@ -366,7 +366,7 @@ bool EnemyPool::CastsShadowIn(const GltfActor& actor, UINT cascade) const
 
     // 行列と箱の大きさは、必ず同じカスケードから取る
     const float margin = GameConfig::Enemy::ShadowMargin * 2.0f
-        / (GameConfig::CascadeAreas[cascade] * _dx12.ShadowAreaScale());
+        / (ShadowConfig::CascadeAreas[cascade] * _dx12.ShadowAreaScale());
 
     return fabsf(ndc.x) <= 1.0f + margin && fabsf(ndc.y) <= 1.0f + margin;
 }

@@ -234,6 +234,7 @@
     <ClInclude Include="Dx12Wrapper.h" />
     <ClInclude Include="Enemy.h" />
     <ClInclude Include="EnemyPool.h" />
+    <ClInclude Include="ShadowConfig.h" />
     <ClInclude Include="Spawner.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CharacterController.h" />
@@ -255,62 +256,36 @@
     <ClInclude Include="Util.h" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="BasicPixelShader.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">BasicPS</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">BasicPS</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">BasicPS</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">BasicPS</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="BasicVertexShader.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">BasicVS</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">BasicVS</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">BasicVS</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">BasicVS</EntryPointName>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-    </FxCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="BasicShaderHeader.hlsli" />
-    <None Include="GltfShaderHeader.hlsli" />
+    <!-- 実行時に D3DCompileFromFile でコンパイルするため、ビルド時の FXC は通さない
+         (None で登録して、編集対象としてだけ見せる) -->
+    <None Include="Shaders\BasicVertexShader.hlsl" />
+    <None Include="Shaders\BasicPixelShader.hlsl" />
+    <None Include="Shaders\BasicShaderHeader.hlsli" />
+    <None Include="Shaders\GltfShaderHeader.hlsli" />
     <!-- glTF 用シェーダーは実行時に D3DCompileFromFile でコンパイルするため、
          ビルド時の FXC は通さない(None で登録して編集対象としてだけ見せる) -->
-    <None Include="GltfVertexShader.hlsl" />
-    <None Include="GltfPixelShader.hlsl" />
-    <None Include="GltfOutlineVertexShader.hlsl" />
-    <None Include="GltfOutlinePixelShader.hlsl" />
-    <None Include="GroundShaderHeader.hlsli" />
-    <None Include="GroundVertexShader.hlsl" />
-    <None Include="GroundPixelShader.hlsl" />
-    <None Include="GltfShadowVertexShader.hlsl" />
-    <None Include="PeraShaderHeader.hlsli" />
-    <None Include="PeraVertexShader.hlsl" />
-    <None Include="PeraPixelShader.hlsl" />
-    <None Include="ShadowCommon.hlsli" />
-    <None Include="StageShaderHeader.hlsli" />
-    <None Include="StageVertexShader.hlsl" />
-    <None Include="StagePixelShader.hlsl" />
-    <None Include="StageShadowVertexShader.hlsl" />
-    <None Include="SpriteShaderHeader.hlsli" />
-    <None Include="SpriteVertexShader.hlsl" />
-    <None Include="SpritePixelShader.hlsl" />
-    <None Include="GateShaderHeader.hlsli" />
-    <None Include="GateVertexShader.hlsl" />
-    <None Include="GatePixelShader.hlsl" />
+    <None Include="Shaders\GltfVertexShader.hlsl" />
+    <None Include="Shaders\GltfPixelShader.hlsl" />
+    <None Include="Shaders\GltfOutlineVertexShader.hlsl" />
+    <None Include="Shaders\GltfOutlinePixelShader.hlsl" />
+    <None Include="Shaders\GroundShaderHeader.hlsli" />
+    <None Include="Shaders\GroundVertexShader.hlsl" />
+    <None Include="Shaders\GroundPixelShader.hlsl" />
+    <None Include="Shaders\GltfShadowVertexShader.hlsl" />
+    <None Include="Shaders\PeraShaderHeader.hlsli" />
+    <None Include="Shaders\PeraVertexShader.hlsl" />
+    <None Include="Shaders\PeraPixelShader.hlsl" />
+    <None Include="Shaders\ShadowCommon.hlsli" />
+    <None Include="Shaders\StageShaderHeader.hlsli" />
+    <None Include="Shaders\StageVertexShader.hlsl" />
+    <None Include="Shaders\StagePixelShader.hlsl" />
+    <None Include="Shaders\StageShadowVertexShader.hlsl" />
+    <None Include="Shaders\SpriteShaderHeader.hlsli" />
+    <None Include="Shaders\SpriteVertexShader.hlsl" />
+    <None Include="Shaders\SpritePixelShader.hlsl" />
+    <None Include="Shaders\GateShaderHeader.hlsli" />
+    <None Include="Shaders\GateVertexShader.hlsl" />
+    <None Include="Shaders\GatePixelShader.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

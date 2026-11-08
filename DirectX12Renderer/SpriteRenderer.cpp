@@ -32,34 +32,10 @@ bool SpriteRenderer::Init()
 
 bool SpriteRenderer::CompileShaders()
 {
-    ComPtr<ID3DBlob> errorBlob;
-
-    // SpriteVertexShader の設定
-    auto result = D3DCompileFromFile(
-        L"SpriteVertexShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "SpriteVS", "vs_5_0",	// 関数は SpriteVS、対象シェーダーは vs_5_0
-        ShaderCompileFlags,
-        0,
-        &_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "SpriteVertexShader")) return false;
-
-    errorBlob.Reset();
-
-    // SpritePixelShaderの設定
-    result = D3DCompileFromFile(
-        L"SpritePixelShader.hlsl",	// シェーダー名
-        nullptr,	// defineは無し
-        D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-        "SpritePS", "ps_5_0",	// 関数は SpritePS、対象シェーダーは ps_5_0
-        ShaderCompileFlags,
-        0,
-        &_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-    );
-    if (!CheckShaderResult(result, errorBlob.Get(), "SpritePixelShader")) return false;
-
+    if (!CompileShader(L"SpriteVertexShader.hlsl", "SpriteVS", "vs_5_0",
+        _vsBlob.ReleaseAndGetAddressOf())) return false;
+    if (!CompileShader(L"SpritePixelShader.hlsl", "SpritePS", "ps_5_0",
+        _psBlob.ReleaseAndGetAddressOf())) return false;
     return true;
 }
 

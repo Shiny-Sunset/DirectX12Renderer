@@ -1,6 +1,6 @@
 ﻿#include "Dx12Wrapper.h"
 #include "Util.h"
-#include "GameConfig.h"
+#include "ShadowConfig.h"
 #include <DirectXTex.h>
 #include <algorithm>
 #include <iostream>
@@ -504,9 +504,9 @@ bool Dx12Wrapper::CreateShadowMap()
 
 	D3D12_RESOURCE_DESC resDesc = {};
 	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Width = GameConfig::ShadowMapSize;
-	resDesc.Height = GameConfig::ShadowMapSize;
-	resDesc.DepthOrArraySize = GameConfig::CascadeCount;   // 2048 × 2048 × 3
+	resDesc.Width = ShadowConfig::ShadowMapSize;
+	resDesc.Height = ShadowConfig::ShadowMapSize;
+	resDesc.DepthOrArraySize = ShadowConfig::CascadeCount;   // 2048 × 2048 × 3
 	resDesc.MipLevels = 1;
 	resDesc.SampleDesc.Count = 1;
 	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
@@ -532,7 +532,7 @@ bool Dx12Wrapper::CreateShadowMap()
 	if (!CheckResult(result, "CreateCommittedResource _shadowMap.ReleaseAndGetAddressOf()")) return false;
 
 	// DSV 用ヒープを作る
-	heapDesc.NumDescriptors = GameConfig::CascadeCount;
+	heapDesc.NumDescriptors = ShadowConfig::CascadeCount;
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	result = _dev->CreateDescriptorHeap(
@@ -551,7 +551,7 @@ bool Dx12Wrapper::CreateShadowMap()
 	auto dsvH = _shadowDSVHeap->GetCPUDescriptorHandleForHeapStart();
 	const auto incSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
-	for (UINT i = 0; i < GameConfig::CascadeCount; ++i)
+	for (UINT i = 0; i < ShadowConfig::CascadeCount; ++i)
 	{
 		dsvDesc.Texture2DArray.FirstArraySlice = i;
 		// DSV を作る
@@ -603,7 +603,7 @@ void Dx12Wrapper::CreateShadowMapView(D3D12_CPU_DESCRIPTOR_HANDLE handle)
 	srvDesc.Texture2DArray.MostDetailedMip = 0;
 	srvDesc.Texture2DArray.MipLevels = 1;
 	srvDesc.Texture2DArray.FirstArraySlice = 0;
-	srvDesc.Texture2DArray.ArraySize = GameConfig::CascadeCount;
+	srvDesc.Texture2DArray.ArraySize = ShadowConfig::CascadeCount;
 
 	_dev->CreateShaderResourceView(_shadowMap.Get(), &srvDesc, handle);
 }
@@ -653,16 +653,16 @@ void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 	auto invLightRot = DirectX::XMMatrixInverse(nullptr, lightRot);
 
 	auto* s = Scene();
-	for (UINT i = 0; i < GameConfig::CascadeCount; ++i)
+	for (UINT i = 0; i < ShadowConfig::CascadeCount; ++i)
 	{
-		const float area = GameConfig::CascadeAreas[i] * _shadowAreaScale;
+		const float area = ShadowConfig::CascadeAreas[i] * _shadowAreaScale;
 
 		// -- 注視点をテクセル境界に合わせる --
 		// 光源カメラが中途半端な位置にあると、影の縁のドットが毎フレーム入れ替わってチラつく
 		// 光源から見た座標系で丸めてから戻すことで、格子が常に同じ場所に来るようにする
 		// テクセルスナップは「そのカスケードの」テクセル幅で行う
 		// 共通にすると、粗いカスケードの影が毎フレーム踊る
-		const float texelSize = area / static_cast<float>(GameConfig::ShadowMapSize);
+		const float texelSize = area / static_cast<float>(ShadowConfig::ShadowMapSize);
 
 		// 光源から見た XY（画面に相当する 2 軸）だけを丸める。Z（奥行き）はそのまま
 		DirectX::XMFLOAT3 snapped;
@@ -685,14 +685,14 @@ void Dx12Wrapper::UpdateLightCamera(const DirectX::XMFLOAT3& center)
 		(&s->cascadeNormalOffset.x)[i] = texelSize * 2.0f;
 	}
 	s->lightVec = _lightVec;
-	s->shadowMapTexel = 1.0f / static_cast<float>(GameConfig::ShadowMapSize);
+	s->shadowMapTexel = 1.0f / static_cast<float>(ShadowConfig::ShadowMapSize);
 	s->lightRange = LightFar - LightNear;
 	// 箱の中心と、カスケードを選ぶ基準を同じ点にする
 		// ここがずれると「カスケード 0 と判定されたのに箱の外」という場所ができる
 	s->shadowCenter = { center.x, center.y, center.z, 0.0f };
 
-	s->cascadeRadius.x = GameConfig::CascadeAreas[0] * GameConfig::CascadeRadiusRatio * _shadowAreaScale;
-	s->cascadeRadius.y = GameConfig::CascadeAreas[1] * GameConfig::CascadeRadiusRatio * _shadowAreaScale;
+	s->cascadeRadius.x = ShadowConfig::CascadeAreas[0] * ShadowConfig::CascadeRadiusRatio * _shadowAreaScale;
+	s->cascadeRadius.y = ShadowConfig::CascadeAreas[1] * ShadowConfig::CascadeRadiusRatio * _shadowAreaScale;
 	s->cascadeRadius.z = 0.0f;
 	s->cascadeRadius.w = 0.0f;
 }
@@ -719,9 +719,9 @@ void Dx12Wrapper::BeginShadowPass()
 
 	// ビューポートはどのカスケードでも同じなので、ここで 1 回
 	D3D12_VIEWPORT vp = {};
-	vp.Width = vp.Height = static_cast<float>(GameConfig::ShadowMapSize);
+	vp.Width = vp.Height = static_cast<float>(ShadowConfig::ShadowMapSize);
 	vp.MaxDepth = 1.0f;
-	D3D12_RECT rect = { 0, 0, GameConfig::ShadowMapSize, GameConfig::ShadowMapSize };
+	D3D12_RECT rect = { 0, 0, ShadowConfig::ShadowMapSize, ShadowConfig::ShadowMapSize };
 	_cmdList->RSSetViewports(1, &vp);
 	_cmdList->RSSetScissorRects(1, &rect);
 }

@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 #include <cassert>
-#include "GameConfig.h"
+#include "ShadowConfig.h"
 
 // DirectX12 の基盤部分をまとめたクラス
 // デバイス、スワップチェーン、コマンド関連、レンダーターゲット、深度バッファ、
@@ -188,7 +188,7 @@ private:
 	{
 		DirectX::XMMATRIX view;          // ビュー行列（PMD のスフィアマップ用）
 		DirectX::XMMATRIX viewProj;      // ビュー × プロジェクション
-		DirectX::XMMATRIX lightCamera[3];   // 光源から見たビュー×プロジェクション
+		DirectX::XMMATRIX lightCamera[ShadowConfig::CascadeCount];   // 光源から見たビュー×プロジェクション
 		DirectX::XMFLOAT3 eye;           // 視点座標
 		float _pad0;
 		DirectX::XMFLOAT3 lightVec;      // 光が進む向き
@@ -278,7 +278,7 @@ private:
 	// -- 平行光源 --
 	DirectX::XMFLOAT3 _lightVec = { 1.0f, -1.0f, 1.0f };   // 光が進む向き（斜め上から）
 	float _lightDistance = 150.0f;   // 注視点から光源を引く距離
-	DirectX::XMMATRIX _lightCamera[GameConfig::CascadeCount];
+	DirectX::XMMATRIX _lightCamera[ShadowConfig::CascadeCount];
 	float _shadowAreaScale = 1.0f;      // 影を落とす範囲の倍率
 
 	// -- テクスチャ --

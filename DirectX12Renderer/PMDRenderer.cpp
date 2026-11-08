@@ -28,33 +28,10 @@ bool PMDRenderer::Init()
 
 bool PMDRenderer::CompileShaders()
 {
-	ComPtr<ID3DBlob> errorBlob;
-
-	// BasicVertexShader の設定
-	auto result = D3DCompileFromFile(
-		L"BasicVertexShader.hlsl",	// シェーダー名
-		nullptr,	// defineは無し
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-		"BasicVS", "vs_5_0",	// 関数は BasicVS、対象シェーダーは vs_5_0
-		ShaderCompileFlags,
-		0,
-		&_vsBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "BasicVertexShader")) return false;
-
-	errorBlob.Reset();
-
-	// BasicPixelShaderの設定
-	result = D3DCompileFromFile(
-		L"BasicPixelShader.hlsl",	// シェーダー名
-		nullptr,	// defineは無し
-		D3D_COMPILE_STANDARD_FILE_INCLUDE,	// インクルードはデフォルト
-		"BasicPS", "ps_5_0",	// 関数は BasicPS、対象シェーダーは ps_5_0
-		ShaderCompileFlags,
-		0,
-		&_psBlob, &errorBlob	// エラー時は errorBlob にメッセージが入る
-	);
-	if (!CheckShaderResult(result, errorBlob.Get(), "BasicPixelShader")) return false;
+	if (!CompileShader(L"BasicVertexShader.hlsl", "BasicVS", "vs_5_0",
+		_vsBlob.ReleaseAndGetAddressOf())) return false;
+	if (!CompileShader(L"BasicPixelShader.hlsl", "BasicPS", "ps_5_0",
+		_psBlob.ReleaseAndGetAddressOf())) return false;
 
 	return true;
 }
