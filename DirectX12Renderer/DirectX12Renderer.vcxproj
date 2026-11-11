@@ -49,13 +49,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
-    <!--
-      全体最適化 (/GL) は切っている。
-      静的 CRT (/MT) と組み合わせると、リンク時のコード生成で
-      imgui_impl_win32.cpp が内部コンパイラエラー (C1001) を起こすため。
-      v145 (14.51.36260.0) 側の不具合で、こちらのコードでは回避できない。
-    -->
-    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -150,7 +144,6 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex;$(ProjectDir)External\imgui;$(ProjectDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

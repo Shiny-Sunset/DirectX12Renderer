@@ -182,35 +182,6 @@ PMD モデルと VMD モーションの描画は、現在は行っていませ�
 > [!NOTE]
 > DirectXTex 側と本プロジェクト側で構成（Debug / Release）が食い違うとリンクエラーになります。参照するライブラリのパスは `$(Platform)\$(Configuration)` で解決しているため、両者を揃えてビルドしてください。
 
-### Release 構成について
-
-Release ではランタイムを**静的リンク**（`/MT`）しています。配布した exe が Visual C++ 再頒布可能パッケージ無しで動くようにするためです。
-
-そのため **DirectXTex も `/MT` でビルドする必要があります**。片方だけだと「ランタイム ライブラリの不一致」（`LNK2038`）になります。
-
-DirectXTex 側のファイルは書き換えたくないので、`DirectXTex/` の直下に次の `Directory.Build.targets` を置いています。MSBuild が自動で読み込むため、**ビルド時に特別な操作は要りません**。
-
-```
-任意のフォルダ/
-├─ DirectX12Renderer/
-└─ DirectXTex/
-   └─ Directory.Build.targets   ← これを作る
-```
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<Project>
-  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
-    <ClCompile>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <OpenMPSupport>false</OpenMPSupport>
-    </ClCompile>
-  </ItemDefinitionGroup>
-</Project>
-```
-
-OpenMP も切っているのは、`/MT` にしただけでは DirectXTex が使う `vcomp140.dll` への依存が残ってしまうためです。Debug は対象外なので、従来どおり `/MDd` のままです。
-
 ### 注意事項
 
 シェーダーを実行時に `D3DCompileFromFile` でコンパイルし、モデルも相対パスで読み込みます。そのため、**作業ディレクトリがプロジェクトフォルダになっていないと、どちらも見つかりません**。
