@@ -368,10 +368,6 @@ void Application::Run()
 	// -- メッセージループ --
 	MSG msg = {};
 
-	// キーが押されている間ずっと true になるので、前フレームと比較して
-	// 「押された瞬間」だけを拾う
-	bool prevOutlineKey = false;
-
 	_timer.Reset();
 	while (true)
 	{

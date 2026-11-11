@@ -64,32 +64,78 @@ DirectX 12 でレンダラーを自作し、その上で 3D アクションゲ�
 | `Space` | ジャンプ |
 | マウス左クリック | 攻撃（2 回当てるとアリを倒せる） |
 | マウス右ドラッグ | カメラを回り込ませる |
+| `ESC` | ポーズ / 再開 |
 | `R`（結果画面） | リスタート |
+| `F1` | デバッグ UI の表示 / 非表示 |
 
 アリは王へ一直線に向かいますが、攻撃すると一定時間プレイヤーを狙ってきます。引き付けて倒すか、王の前で迎え撃つかが判断どころです。
-| `O` | 輪郭線の表示 / 非表示を切り替え |
-| `1` / `2` / `3` | アニメーションを Idle / Walk / Run に切り替え |
 
 プレイヤーと敵は同じモデルのデータを共有し、位置とアニメーションの再生状態だけを個別に持っています。
 
-画面上の「Debug」ウィンドウから、以下を確認・変更できます。ImGui の入力欄にフォーカスがある間は、上記のキー操作は無効になります。
+## デバッグ UI
+
+Dear ImGui でデバッグ用の表示を 2 つ出しています。**ゲーム中の文字には ImGui を使っていません**（自作のスプライトバッチとフォントアトラスで描いています）。
+
+| ウィンドウ | 表示 |
+|---|---|
+| `Debug` | `F1` で表示 / 非表示。**Debug 構成では既定で表示、Release 構成では非表示** |
+| `Profile`（画面右上） | 常に表示。入力を受け取らない軽量なオーバーレイ |
+
+ImGui の入力欄にフォーカスがある間は、ゲームのキー操作は無効になります。
+
+### `Debug` ウィンドウ
+
+上から順に、以下を確認・変更できます。
 
 | 項目 | 内容 |
 |---|---|
 | FPS / dt | フレームレートと、1 フレームの経過時間 |
-| Time Scale | ゲーム内時間の倍率（0 で一時停止、0.5 でスロー） |
+| Time Scale | ゲーム内時間の倍率（0 で一時停止、0.5 でスロー。0〜3） |
+| 1920 x 1080 / 1280 x 720 / Fullscreen | 表示モードの切り替え。UI とフォントの大きさも追従する |
+| Profile (ms) | GPU wait / AI / Collision / Anim / Record の内訳 |
+| Enemies | 生存数と上限、描画数、カスケードごとの影の描画数、討伐数、生存時間 |
 | VSync | 垂直同期の切り替え（切るとフレームレートの上限が外れる） |
-| Position / Rotation Y | モデルの位置と向き |
+| **Balance** | |
+| Spawn Interval | スポーン間隔の倍率（大きいほどアリが来ない） |
+| Ant Speed | アリの移動速度の倍率 |
+| Enemy Limit | 同時に存在できるアリの数（上限はプールの大きさ） |
+| King HP | 王の最大 HP（**リスタートから反映**） |
+| **Light** | |
+| Azimuth / Elevation | 光源の向き（方位角と仰角）。影の向きと長さが変わる |
+| Shadow Area Scale | 影を落とす範囲の**倍率**。狭めるほど影が精細になる |
+| **Camera** | |
+| Distance / Height | 三人称カメラの距離と高さ |
+| **Transform** | |
+| Position / Rotation Y | プレイヤーの位置と向き |
+| **Character** | |
+| Grounded / VelocityY | 接地しているかと、垂直方向の速度 |
+| Walk Speed / Run Speed | 歩く速さと走る速さ（m/秒） |
+| Jump Height / Gravity | ジャンプの到達高さと重力の強さ |
 | Outline | 輪郭線の表示 / 非表示 |
 | Anim / Blend | 再生中のアニメーション名と、クロスフェードの進み具合（0 → 1） |
-| Animation | 再生するアニメーションの選択 |
-| Azimuth / Elevation | 光源の向き（方位角と仰角）。影の向きと長さが変わる |
-| Shadow Area | シャドウマップがカバーする範囲。狭めるほど影が精細になる |
-| Grounded / VelocityY | 接地しているかと、垂直方向の速度 |
-| Jump Height / Gravity | ジャンプの到達高さと重力の強さ |
-| Walk Speed / Run Speed | 歩く速さと走る速さ（m/秒） |
-| Radius | 当たり判定の球の半径 |
-| Enemies | 敵ごとの現在の状態（Idle / Chase） |
+| **Collision** | |
+| Radius | プレイヤーの当たり判定の球の半径 |
+| Input drops | 入力の取りこぼしを検出した回数（調査用に残してあります） |
+| Dist to #1 | プレイヤーと王の距離と、半径の合計 |
+| **King** | |
+| HP / King Scale | 王の体力と拡大率（半径は拡大率に連動） |
+
+### `Profile` ウィンドウ
+
+1 フレームの内訳を常に表示します。**GPU 側はタイムスタンプクエリで実測した値**です。
+
+```
+640.2 FPS (1.56 ms)
+GPU wait 0.036 / CPU 1.385
+GPU 1.453 = Shadow 0.610 + Scene 0.772 + Pera 0.071
+AI 0.112  Col 0.138
+  Ground 0.021  Move 0.034  Stage1 0.012
+Anim 0.286 = Sample 0.081 + Bone 0.142 + Inst 0.063
+  Pairs 0.286 (Build 0.094 + Test 0.192)  Stage2 0.008  Unstuck 0.003
+Frames in flight 2  ShadowMap 2048  BufferCount 3
+```
+
+上の数値はアリ 500 体、Release 構成・VSync オフでの実測です。
 
 ## 動作環境
 
@@ -100,12 +146,17 @@ DirectX 12 でレンダラーを自作し、その上で 3D アクションゲ�
 | C++ | C++20 |
 | プラットフォーム | x64 |
 
-## モデル、モーションファイルの指定方法
+## モデルファイルの指定方法
 
-`DirectX12Renderer/Application.cpp` で指定しています。
+`DirectX12Renderer/Application.cpp` の先頭付近（無名名前空間）で指定しています。
 
-- glTF モデル：`Application::Init` 内の `_gltfActor->Init("Model/DangoGirl.glb")`
-- PMD モデル / VMD モーション：ファイル先頭付近の `model_path`、`motion_path`（現在は glTF の描画に切り替えているため、PMD の処理はコメントアウトしています）
+| 定数 | 既定値 | 用途 |
+|---|---|---|
+| `PlayerModelPath` | `Model/DangoGirl.glb` | プレイヤー |
+| `KingModelPath` | `Model/dangomushi.glb` | 王（防衛対象） |
+| `AntModelPath` | `Model/Ant.glb` | 敵 |
+
+PMD モデルと VMD モーションの描画は、現在は行っていません（`PMDActor` を生成していないため）。書籍で学んだ記録としてコードは残してあります。
 
 ## ビルド方法
 
@@ -133,11 +184,11 @@ DirectX 12 でレンダラーを自作し、その上で 3D アクションゲ�
 
 ### Release 構成について
 
-配布した exe が実行環境を選ばないよう、Release ではランタイムを**静的リンク**（`/MT`）しています。Visual C++ 再頒布可能パッケージが無くても動きます。
+Release ではランタイムを**静的リンク**（`/MT`）しています。配布した exe が Visual C++ 再頒布可能パッケージ無しで動くようにするためです。
 
-そのため、**DirectXTex も `/MT` でビルドする必要があります**。片方だけだと「ランタイム ライブラリの不一致」（`LNK2038`）になります。
+そのため **DirectXTex も `/MT` でビルドする必要があります**。片方だけだと「ランタイム ライブラリの不一致」（`LNK2038`）になります。
 
-DirectXTex 側のファイルは書き換えたくないので、`DirectXTex/` の直下に以下の `Directory.Build.targets` を置いています。MSBuild はプロジェクトのあるフォルダから上へ辿って最初に見つけたこのファイルを自動で読み込むため、**ビルド時に特別な操作は要りません**。読み込まれるのはプロジェクト本体の設定より後なので、`ItemDefinitionGroup` を上書きできます。
+DirectXTex 側のファイルは書き換えたくないので、`DirectXTex/` の直下に次の `Directory.Build.targets` を置いています。MSBuild が自動で読み込むため、**ビルド時に特別な操作は要りません**。
 
 ```
 任意のフォルダ/
@@ -158,21 +209,27 @@ DirectXTex 側のファイルは書き換えたくないので、`DirectXTex/` �
 </Project>
 ```
 
-Debug は対象外なので、従来どおり `/MDd` のままです。
+OpenMP も切っているのは、`/MT` にしただけでは DirectXTex が使う `vcomp140.dll` への依存が残ってしまうためです。Debug は対象外なので、従来どおり `/MDd` のままです。
 
-あわせて OpenMP も切っています。`/MT` にしただけでは DirectXTex が使う `vcomp140.dll` への依存が残り、結局は再頒布可能パッケージが必要になってしまうためです。OpenMP は BC6H / BC7 圧縮の並列化にしか使われておらず、本プロジェクトはテクスチャの読み込みしか行わないので影響しません。
+### 注意事項
 
-なお Release では全体最適化（`/GL`）を切っています。`/MT` と組み合わせるとリンク時のコード生成で `imgui_impl_win32.cpp` が内部コンパイラエラー（`C1001`）を起こすためです。
+シェーダーを実行時に `D3DCompileFromFile` でコンパイルし、モデルも相対パスで読み込みます。そのため、**作業ディレクトリがプロジェクトフォルダになっていないと、どちらも見つかりません**。
 
-### 配布する場合
-
-シェーダーを実行時に `D3DCompileFromFile` でコンパイルし、モデルも相対パスで読むため、**exe 単体では動きません**。同じフォルダに以下を並べてください。
+Visual Studio から実行する場合は作業ディレクトリが `$(ProjectDir)` になるため、そのまま動きます。exe を直接起動する場合は、以下を exe と同じ場所に並べてください。
 
 ```
 DirectX12Renderer.exe
-*.hlsl / *.hlsli      ← プロジェクト直下のシェーダー一式
-Model/*.glb           ← モデル
+Shaders/     ← *.hlsl / *.hlsli 一式
+Model/       ← *.glb
 ```
+
+とくに **`Model/` の配置**にご注意ください。以下の 3 つが読み込めないと起動に失敗します。
+
+| ファイル | 用途 |
+|---|---|
+| `Model/DangoGirl.glb` | プレイヤー |
+| `Model/dangomushi.glb` | 王（防衛対象） |
+| `Model/Ant.glb` | 敵 |
 
 ## アセットの入手
 
