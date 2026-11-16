@@ -51,6 +51,24 @@ DirectX 12 でレンダラーを自作し、その上で 3D アクションゲ�
 - [x] 防衛対象（王）と、ヘイトによる標的の切り替え（攻撃されると一定時間プレイヤーを狙う）
 - [x] 障害物の回避（進めていないことを検知して横へ逸れる）と、めり込みからの強制脱出
 - [x] スコアの集計と結果画面、ゲームバランスの調整値の一元管理
+- [x] レンダラーの切り出し（静的ライブラリ化。ゲーム側への依存を 0 にし、他のゲームへ持ち出せる形へ）
+
+## 構成
+
+レンダラー部分は静的ライブラリ `DangoRenderer.lib` として分けてあり、`Renderer/` フォルダ単位で別のゲームへ持っていけます。
+
+```
+DirectX12Renderer/
+├─ Renderer/              ← レンダラー（静的ライブラリ）
+│   ├─ Core/ Model/ 2D/ Prim/ Platform/ Debug/
+│   ├─ Shaders/           ← レンダラーが使うシェーダー 19 本
+│   └─ External/          ← cgltf / Dear ImGui
+└─ DirectX12Renderer/     ← ゲーム（exe）
+    ├─ Game/ Legacy/
+    └─ Shaders/           ← ゲーム固有のシェーダー 7 本
+```
+
+レンダラー側の使い方・ルートシグネチャの規約・組み込み手順は [Renderer/README.md](Renderer/README.md) にまとめています。
 
 ## 遊び方
 
@@ -148,7 +166,7 @@ Frames in flight 2  ShadowMap 2048  BufferCount 3
 
 ## モデルファイルの指定方法
 
-`DirectX12Renderer/Application.cpp` の先頭付近（無名名前空間）で指定しています。
+`DirectX12Renderer/Game/Application.cpp` の先頭付近（無名名前空間）で指定しています。
 
 | 定数 | 既定値 | 用途 |
 |---|---|---|
@@ -190,9 +208,11 @@ Visual Studio から実行する場合は作業ディレクトリが `$(ProjectD
 
 ```
 DirectX12Renderer.exe
-Shaders/     ← *.hlsl / *.hlsli 一式
+Shaders/     ← *.hlsl / *.hlsli 一式（26 本）
 Model/       ← *.glb
 ```
+
+開発時はシェーダーが `DirectX12Renderer/Shaders/`（7 本）と `Renderer/Shaders/`（19 本）に分かれていますが、**配布するときは 1 つのフォルダにまとめて置けます**。`Shaders/` → `../Renderer/Shaders/` の順に探し、`#include` も同じ順で解決するためです。
 
 とくに **`Model/` の配置**にご注意ください。以下の 3 つが読み込めないと起動に失敗します。
 
@@ -260,4 +280,4 @@ Copyright (c) 2026 Shiny-Sunset
 | [cgltf](https://github.com/jkuhlmann/cgltf) | MIT License | Copyright (c) 2018-2021 Johannes Kuhlmann |
 | [Dear ImGui](https://github.com/ocornut/imgui) | MIT License | Copyright (c) 2014-2026 Omar Cornut |
 
-cgltf は `DirectX12Renderer/External/cgltf.h`、Dear ImGui は `DirectX12Renderer/External/imgui/` として同梱しています。
+cgltf は `Renderer/External/cgltf.h`、Dear ImGui は `Renderer/External/imgui/` として同梱しています。

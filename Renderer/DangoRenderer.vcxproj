@@ -1,0 +1,214 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{3f8a1d42-6b27-4c93-9e05-7a2d4c81b6f1}</ProjectGuid>
+    <RootNamespace>DangoRenderer</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/external:I "$(ProjectDir)External" %(AdditionalOptions)</AdditionalOptions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NOMINMAX;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex;$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Model;$(ProjectDir)2D;$(ProjectDir)Prim;$(ProjectDir)Platform;$(ProjectDir)Debug;$(ProjectDir)External\imgui;$(ProjectDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/external:I "$(ProjectDir)External" %(AdditionalOptions)</AdditionalOptions>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NOMINMAX;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex;$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Model;$(ProjectDir)2D;$(ProjectDir)Prim;$(ProjectDir)Platform;$(ProjectDir)Debug;$(ProjectDir)External\imgui;$(ProjectDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/external:I "$(ProjectDir)External" %(AdditionalOptions)</AdditionalOptions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NOMINMAX;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex;$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Model;$(ProjectDir)2D;$(ProjectDir)Prim;$(ProjectDir)Platform;$(ProjectDir)Debug;$(ProjectDir)External\imgui;$(ProjectDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
+      <AdditionalOptions>/external:I "$(ProjectDir)External" %(AdditionalOptions)</AdditionalOptions>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NOMINMAX;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\DirectXTex\DirectXTex;$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Model;$(ProjectDir)2D;$(ProjectDir)Prim;$(ProjectDir)Platform;$(ProjectDir)Debug;$(ProjectDir)External\imgui;$(ProjectDir)External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="Core\Dx12Wrapper.cpp" />
+    <ClCompile Include="Core\Pera.cpp" />
+    <ClCompile Include="Core\Util.cpp" />
+    <ClCompile Include="Model\GltfActor.cpp" />
+    <ClCompile Include="Model\GltfModel.cpp" />
+    <ClCompile Include="Model\GltfRenderer.cpp" />
+    <ClCompile Include="2D\FontAtlas.cpp" />
+    <ClCompile Include="2D\SpriteRenderer.cpp" />
+    <ClCompile Include="Prim\GateEffect.cpp" />
+    <ClCompile Include="Prim\Ground.cpp" />
+    <ClCompile Include="Platform\GameTimer.cpp" />
+    <ClCompile Include="Platform\Input.cpp" />
+    <ClCompile Include="Debug\DebugUI.cpp" />
+  </ItemGroup>
+  <!-- Dear ImGui（サードパーティ。ソースは編集しないこと）
+       ソースが BOM なしの UTF-8 のため、日本語版 Windows で CP932 と誤認されて C4819 が出る。
+       プロジェクト全体に /utf-8 を付けると日本語パスの fopen が壊れるため、ImGui の .cpp にだけ個別に指定する -->
+  <ItemGroup>
+    <ClCompile Include="External\imgui\imgui.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_demo.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_draw.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_tables.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_widgets.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="External\imgui\backends\imgui_impl_dx12.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="External\imgui\backends\imgui_impl_win32.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\Dx12Wrapper.h" />
+    <ClInclude Include="Core\Pera.h" />
+    <ClInclude Include="Core\ShadowConfig.h" />
+    <ClInclude Include="Core\Util.h" />
+    <ClInclude Include="Model\GltfActor.h" />
+    <ClInclude Include="Model\GltfModel.h" />
+    <ClInclude Include="Model\GltfRenderer.h" />
+    <ClInclude Include="2D\FontAtlas.h" />
+    <ClInclude Include="2D\SpriteRenderer.h" />
+    <ClInclude Include="Prim\GateEffect.h" />
+    <ClInclude Include="Prim\Ground.h" />
+    <ClInclude Include="Platform\GameTimer.h" />
+    <ClInclude Include="Platform\Input.h" />
+    <ClInclude Include="Debug\DebugUI.h" />
+    <ClInclude Include="External\cgltf.h" />
+    <ClInclude Include="External\imgui\imconfig.h" />
+    <ClInclude Include="External\imgui\imgui.h" />
+    <ClInclude Include="External\imgui\imgui_internal.h" />
+    <ClInclude Include="External\imgui\imstb_rectpack.h" />
+    <ClInclude Include="External\imgui\imstb_textedit.h" />
+    <ClInclude Include="External\imgui\imstb_truetype.h" />
+    <ClInclude Include="External\imgui\backends\imgui_impl_dx12.h" />
+    <ClInclude Include="External\imgui\backends\imgui_impl_win32.h" />
+  </ItemGroup>
+  <!-- シェーダーは実行時に D3DCompileFromFile でコンパイルするため、ビルド対象にはしない。
+       実行時は作業ディレクトリから見た相対パスで探す (Util.cpp の g_shaderDirs) -->
+  <ItemGroup>
+    <None Include="Shaders\GateShaderHeader.hlsli" />
+    <None Include="Shaders\GateVertexShader.hlsl" />
+    <None Include="Shaders\GatePixelShader.hlsl" />
+    <None Include="Shaders\GltfShaderHeader.hlsli" />
+    <None Include="Shaders\GltfVertexShader.hlsl" />
+    <None Include="Shaders\GltfPixelShader.hlsl" />
+    <None Include="Shaders\GltfOutlineVertexShader.hlsl" />
+    <None Include="Shaders\GltfOutlinePixelShader.hlsl" />
+    <None Include="Shaders\GltfShadowVertexShader.hlsl" />
+    <None Include="Shaders\GroundShaderHeader.hlsli" />
+    <None Include="Shaders\GroundVertexShader.hlsl" />
+    <None Include="Shaders\GroundPixelShader.hlsl" />
+    <None Include="Shaders\PeraShaderHeader.hlsli" />
+    <None Include="Shaders\PeraVertexShader.hlsl" />
+    <None Include="Shaders\PeraPixelShader.hlsl" />
+    <None Include="Shaders\ShadowCommon.hlsli" />
+    <None Include="Shaders\SpriteShaderHeader.hlsli" />
+    <None Include="Shaders\SpriteVertexShader.hlsl" />
+    <None Include="Shaders\SpritePixelShader.hlsl" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

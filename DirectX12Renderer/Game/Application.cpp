@@ -227,7 +227,10 @@ void Application::OnResize(int w, int h)
 
 bool Application::Init()
 {
-	SetShaderDirectory(L"Shaders/");
+	// シェーダーを探す順番。ゲーム側 → レンダラー側
+	// レンダラーは Renderer/ フォルダごと別のゲームへ持っていけるように、
+	// 自分のシェーダーを自分のフォルダに置いている
+	SetShaderDirectories({ L"Shaders/", L"../Renderer/Shaders/" });
 
 	auto result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 	if (FAILED(result))

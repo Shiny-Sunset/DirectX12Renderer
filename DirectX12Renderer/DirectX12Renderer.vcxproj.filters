@@ -1,255 +1,99 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="External">
-      <UniqueIdentifier>{1410e01a-fde3-5553-87e7-8b4de8101c00}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\imgui">
-      <UniqueIdentifier>{b159f0e1-fcdf-5265-aa5d-6818e8683868}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\imgui\backends">
-      <UniqueIdentifier>{53bff519-462b-5e85-bb29-bd45088f696a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Game">
-      <UniqueIdentifier>{b9d79347-9eeb-5162-a190-8da3f9576ab2}</UniqueIdentifier>
+      <UniqueIdentifier>{ef20f027-254d-5a34-b550-6135876a46f5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Legacy">
-      <UniqueIdentifier>{e536070a-36fd-57af-abe1-44d5bf6e7709}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer">
-      <UniqueIdentifier>{6ec78635-5024-5cda-a714-e88a1f3ca44c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\2D">
-      <UniqueIdentifier>{c463367d-56e2-5489-8b21-6bc48f6c5fc3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\Core">
-      <UniqueIdentifier>{be21bf18-0052-53d9-b1cc-5dd04d75ddf3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\Debug">
-      <UniqueIdentifier>{3a5aa5e6-38cb-5663-a7b5-762ef2ac5ea5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\Model">
-      <UniqueIdentifier>{7d4a6a36-917c-54a7-a313-cdfd357409e5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\Platform">
-      <UniqueIdentifier>{d73b34bc-fd54-550f-b857-0f42464df47c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Renderer\Prim">
-      <UniqueIdentifier>{a0feb9be-dfa0-5ad5-bf7f-75beff1f8185}</UniqueIdentifier>
+      <UniqueIdentifier>{5e8a56ed-df31-592f-a6db-5414c638f6a5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Shaders">
-      <UniqueIdentifier>{2e9db037-d7cb-50c0-a315-68c1ea1ab05a}</UniqueIdentifier>
+      <UniqueIdentifier>{7115e88f-8e0d-5362-ba37-3a04b62d6e02}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Application.cpp">
+    <ClCompile Include="Game\Application.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Collision.cpp">
+    <ClCompile Include="Game\Collision.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="DebugUI.cpp">
-      <Filter>Renderer\Debug</Filter>
-    </ClCompile>
-    <ClCompile Include="Dx12Wrapper.cpp">
-      <Filter>Renderer\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Enemy.cpp">
+    <ClCompile Include="Game\Enemy.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="EnemyPool.cpp">
+    <ClCompile Include="Game\EnemyPool.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Spawner.cpp">
+    <ClCompile Include="Game\Spawner.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Camera.cpp">
+    <ClCompile Include="Game\Camera.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="CharacterController.cpp">
+    <ClCompile Include="Game\CharacterController.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="GameTimer.cpp">
-      <Filter>Renderer\Platform</Filter>
-    </ClCompile>
-    <ClCompile Include="GltfModel.cpp">
-      <Filter>Renderer\Model</Filter>
-    </ClCompile>
-    <ClCompile Include="Ground.cpp">
-      <Filter>Renderer\Prim</Filter>
-    </ClCompile>
-    <ClCompile Include="Input.cpp">
-      <Filter>Renderer\Platform</Filter>
-    </ClCompile>
-    <ClCompile Include="King.cpp">
+    <ClCompile Include="Game\King.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="GltfActor.cpp">
-      <Filter>Renderer\Model</Filter>
-    </ClCompile>
-    <ClCompile Include="GltfRenderer.cpp">
-      <Filter>Renderer\Model</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="Game\main.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Pera.cpp">
-      <Filter>Renderer\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="Player.cpp">
+    <ClCompile Include="Game\Player.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="PMDActor.cpp">
+    <ClCompile Include="Legacy\PMDActor.cpp">
       <Filter>Legacy</Filter>
     </ClCompile>
-    <ClCompile Include="PMDRenderer.cpp">
+    <ClCompile Include="Legacy\PMDRenderer.cpp">
       <Filter>Legacy</Filter>
     </ClCompile>
-    <ClCompile Include="FontAtlas.cpp">
-      <Filter>Renderer\2D</Filter>
-    </ClCompile>
-    <ClCompile Include="SpriteRenderer.cpp">
-      <Filter>Renderer\2D</Filter>
-    </ClCompile>
-    <ClCompile Include="GateEffect.cpp">
-      <Filter>Renderer\Prim</Filter>
-    </ClCompile>
-    <ClCompile Include="Stage.cpp">
+    <ClCompile Include="Game\Stage.cpp">
       <Filter>Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Util.cpp">
-      <Filter>Renderer\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="External\imgui\imgui.cpp">
-      <Filter>External\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="External\imgui\imgui_demo.cpp">
-      <Filter>External\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="External\imgui\imgui_draw.cpp">
-      <Filter>External\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="External\imgui\imgui_tables.cpp">
-      <Filter>External\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="External\imgui\imgui_widgets.cpp">
-      <Filter>External\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="External\imgui\backends\imgui_impl_dx12.cpp">
-      <Filter>External\imgui\backends</Filter>
-    </ClCompile>
-    <ClCompile Include="External\imgui\backends\imgui_impl_win32.cpp">
-      <Filter>External\imgui\backends</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Collision.h">
+    <ClInclude Include="Game\Collision.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="DebugUI.h">
-      <Filter>Renderer\Debug</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui\imconfig.h">
-      <Filter>External\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui\imgui.h">
-      <Filter>External\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui\imgui_internal.h">
-      <Filter>External\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui\imstb_rectpack.h">
-      <Filter>External\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui\imstb_textedit.h">
-      <Filter>External\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui\imstb_truetype.h">
-      <Filter>External\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui\backends\imgui_impl_dx12.h">
-      <Filter>External\imgui\backends</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui\backends\imgui_impl_win32.h">
-      <Filter>External\imgui\backends</Filter>
-    </ClInclude>
-    <ClInclude Include="GltfModel.h">
-      <Filter>Renderer\Model</Filter>
-    </ClInclude>
-    <ClInclude Include="Pera.h">
-      <Filter>Renderer\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Application.h">
+    <ClInclude Include="Game\Application.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="Dx12Wrapper.h">
-      <Filter>Renderer\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Enemy.h">
+    <ClInclude Include="Game\Enemy.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="EnemyPool.h">
+    <ClInclude Include="Game\EnemyPool.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="ShadowConfig.h">
-      <Filter>Renderer\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="Spawner.h">
+    <ClInclude Include="Game\Spawner.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="Camera.h">
+    <ClInclude Include="Game\Camera.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="CharacterController.h">
+    <ClInclude Include="Game\CharacterController.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="GameConfig.h">
+    <ClInclude Include="Game\GameConfig.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="GameTimer.h">
-      <Filter>Renderer\Platform</Filter>
-    </ClInclude>
-    <ClInclude Include="Ground.h">
-      <Filter>Renderer\Prim</Filter>
-    </ClInclude>
-    <ClInclude Include="Input.h">
-      <Filter>Renderer\Platform</Filter>
-    </ClInclude>
-    <ClInclude Include="King.h">
+    <ClInclude Include="Game\King.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="GltfActor.h">
-      <Filter>Renderer\Model</Filter>
-    </ClInclude>
-    <ClInclude Include="GltfRenderer.h">
-      <Filter>Renderer\Model</Filter>
-    </ClInclude>
-    <ClInclude Include="Player.h">
+    <ClInclude Include="Game\Player.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="PMDActor.h">
+    <ClInclude Include="Legacy\PMDActor.h">
       <Filter>Legacy</Filter>
     </ClInclude>
-    <ClInclude Include="PMDRenderer.h">
+    <ClInclude Include="Legacy\PMDRenderer.h">
       <Filter>Legacy</Filter>
     </ClInclude>
-    <ClInclude Include="FontAtlas.h">
-      <Filter>Renderer\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="SpriteRenderer.h">
-      <Filter>Renderer\2D</Filter>
-    </ClInclude>
-    <ClInclude Include="GateEffect.h">
-      <Filter>Renderer\Prim</Filter>
-    </ClInclude>
-    <ClInclude Include="Stage.h">
+    <ClInclude Include="Game\Stage.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="UIText.h">
+    <ClInclude Include="Game\UIText.h">
       <Filter>Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Util.h">
-      <Filter>Renderer\Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -262,45 +106,6 @@
     <None Include="Shaders\BasicShaderHeader.hlsli">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\GltfShaderHeader.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GltfVertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GltfPixelShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GltfOutlineVertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GltfOutlinePixelShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GroundShaderHeader.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GroundVertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GroundPixelShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GltfShadowVertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\PeraShaderHeader.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\PeraVertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\PeraPixelShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\ShadowCommon.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="Shaders\StageShaderHeader.hlsli">
       <Filter>Shaders</Filter>
     </None>
@@ -311,24 +116,6 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\StageShadowVertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\SpriteShaderHeader.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\SpriteVertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\SpritePixelShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GateShaderHeader.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GateVertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\GatePixelShader.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

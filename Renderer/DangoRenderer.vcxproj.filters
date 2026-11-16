@@ -1,0 +1,227 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="2D">
+      <UniqueIdentifier>{b79b2fce-82ec-5a15-8cdd-b1c9d6f1887d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{9b56c226-6b96-56d5-82f9-ed43a06c8169}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Debug">
+      <UniqueIdentifier>{b64b4dae-368e-5ec2-b5b9-e3edc837f9fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External">
+      <UniqueIdentifier>{c182f730-2c5c-52b9-9774-6f782e326254}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\imgui">
+      <UniqueIdentifier>{f362e324-1685-5770-9780-75800aff96b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\imgui\backends">
+      <UniqueIdentifier>{77cf051f-6554-59ee-8068-b9d48ccd9edb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Model">
+      <UniqueIdentifier>{5491fabe-ccb7-5ca4-9570-a632fb295950}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform">
+      <UniqueIdentifier>{68fa1661-7840-58fe-ab59-d1004ae85ae4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Prim">
+      <UniqueIdentifier>{24a135ce-3b71-5e44-9183-1f74ea42f408}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{dd21d876-c67d-58ee-9987-6a9058ac7189}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Core\Dx12Wrapper.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Pera.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core\Util.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Model\GltfActor.cpp">
+      <Filter>Model</Filter>
+    </ClCompile>
+    <ClCompile Include="Model\GltfModel.cpp">
+      <Filter>Model</Filter>
+    </ClCompile>
+    <ClCompile Include="Model\GltfRenderer.cpp">
+      <Filter>Model</Filter>
+    </ClCompile>
+    <ClCompile Include="2D\FontAtlas.cpp">
+      <Filter>2D</Filter>
+    </ClCompile>
+    <ClCompile Include="2D\SpriteRenderer.cpp">
+      <Filter>2D</Filter>
+    </ClCompile>
+    <ClCompile Include="Prim\GateEffect.cpp">
+      <Filter>Prim</Filter>
+    </ClCompile>
+    <ClCompile Include="Prim\Ground.cpp">
+      <Filter>Prim</Filter>
+    </ClCompile>
+    <ClCompile Include="Platform\GameTimer.cpp">
+      <Filter>Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="Platform\Input.cpp">
+      <Filter>Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="Debug\DebugUI.cpp">
+      <Filter>Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui.cpp">
+      <Filter>External\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_demo.cpp">
+      <Filter>External\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_draw.cpp">
+      <Filter>External\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_tables.cpp">
+      <Filter>External\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\imgui_widgets.cpp">
+      <Filter>External\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>External\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="External\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>External\imgui\backends</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\Dx12Wrapper.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Pera.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\ShadowConfig.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Util.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Model\GltfActor.h">
+      <Filter>Model</Filter>
+    </ClInclude>
+    <ClInclude Include="Model\GltfModel.h">
+      <Filter>Model</Filter>
+    </ClInclude>
+    <ClInclude Include="Model\GltfRenderer.h">
+      <Filter>Model</Filter>
+    </ClInclude>
+    <ClInclude Include="2D\FontAtlas.h">
+      <Filter>2D</Filter>
+    </ClInclude>
+    <ClInclude Include="2D\SpriteRenderer.h">
+      <Filter>2D</Filter>
+    </ClInclude>
+    <ClInclude Include="Prim\GateEffect.h">
+      <Filter>Prim</Filter>
+    </ClInclude>
+    <ClInclude Include="Prim\Ground.h">
+      <Filter>Prim</Filter>
+    </ClInclude>
+    <ClInclude Include="Platform\GameTimer.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="Platform\Input.h">
+      <Filter>Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="Debug\DebugUI.h">
+      <Filter>Debug</Filter>
+    </ClInclude>
+    <ClInclude Include="External\cgltf.h">
+      <Filter>External</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imconfig.h">
+      <Filter>External\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imgui.h">
+      <Filter>External\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imgui_internal.h">
+      <Filter>External\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imstb_rectpack.h">
+      <Filter>External\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imstb_textedit.h">
+      <Filter>External\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\imstb_truetype.h">
+      <Filter>External\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\backends\imgui_impl_dx12.h">
+      <Filter>External\imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="External\imgui\backends\imgui_impl_win32.h">
+      <Filter>External\imgui\backends</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\GateShaderHeader.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GateVertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GatePixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GltfShaderHeader.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GltfVertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GltfPixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GltfOutlineVertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GltfOutlinePixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GltfShadowVertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GroundShaderHeader.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GroundVertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\GroundPixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\PeraShaderHeader.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\PeraVertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\PeraPixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\ShadowCommon.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\SpriteShaderHeader.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\SpriteVertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\SpritePixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>

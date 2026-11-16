@@ -6,6 +6,9 @@
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <chrono>
+#include <vector>
+#include <fstream>
+#include <unordered_map>
 
 // シェーダーをコンパイルするときのオプション
 // Debug ではシェーダーデバッガで追えるように最適化を切り、Release では最適化する
@@ -58,12 +61,12 @@ std::string GetTexturePathFromModelAndTexPath(const std::string& modelPath, cons
 // @return 変換されたワイド文字列
 std::wstring GetWideStringFromString(const std::string& str);
 
-// シェーダーを置いたフォルダ。末尾に区切りを付けて渡す（例: L"Shaders/"）
-// 起動時に 1 回だけ設定する
-void SetShaderDirectory(const std::wstring& dir);
+// シェーダーを探すフォルダ。前から順に見て、最初に見つかったものを使う
+// （C++ の #include と同じ考え方。末尾に区切りを付けて渡す）
+void SetShaderDirectories(std::vector<std::wstring> dirs);
 
 // シェーダーをファイルから読んでコンパイルする
-// フォルダは SetShaderDirectory で設定したものを前に付けるので、ファイル名だけ渡す
+// フォルダは SetShaderDirectories で設定したものを前に付けるので、ファイル名だけ渡す
 // @param fileName  例: L"GltfVertexShader.hlsl"
 // @param entry     エントリポイント関数名
 // @param target    例: "vs_5_0"
