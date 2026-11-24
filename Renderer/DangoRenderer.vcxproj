@@ -68,6 +68,13 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <!-- 出力先をプロジェクトの下に固定する。
+       既定の OutDir は $(SolutionDir)$(Platform)\$(Configuration)\ なので、
+       Visual Studio (ソリューション経由) と .vcxproj の直接ビルドとで置き場所が変わる。
+       両方に exe が残ると、古いほうを実行して「直したのに直らない」状態になる -->
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
